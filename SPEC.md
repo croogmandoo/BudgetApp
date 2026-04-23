@@ -1,6 +1,14 @@
 # BudgetApp — Specification (Draft)
 
-> **Status:** Early draft. Sections marked **[OPEN]** need product decisions before implementation can start. Security-sensitive items are tagged **[SEC]**.
+> **Status:** Draft, revision 2. Sections marked **[OPEN]** need product decisions before implementation can start. Security-sensitive items are tagged **[SEC]**.
+
+## 0. Decisions Locked In (rev 2)
+
+- **Multi-user** household, separate logins per member (sharing model for data still **[OPEN]**, see §7.1).
+- **Import:** file-based primary (CSV/OFX/QFX), aggregator is a later milestone.
+- **Banks targeted at launch:** Amex Canada, CIBC, TD, RBC, Scotiabank. Primary currency **CAD**; USD transactions must round-trip cleanly (common on Amex and cross-border spend).
+- **Stack bias:** "robust" + nice UI + first-class API for external integrations (see §9 for the proposed stack, still pending confirmation).
+- **Encryption-key custody:** convenient — master key lives in env/secret, app starts unattended after reboot.
 
 ## 1. Vision
 
@@ -24,18 +32,25 @@ Security is a first-class pillar, not an afterthought (see §7).
 
 ### 3.1 Accounts & Transactions
 - Multiple accounts (checking, savings, credit card, cash, loan). **[OPEN]** Investment/brokerage accounts in scope?
-- Transaction model: date, amount, payee, memo, account, category, tags, split children, attached receipt.
-- **Import** — **[OPEN]** Pick one or more:
-  - (a) File import only: CSV / OFX / QFX / QIF (simplest, no third-party dep).
-  - (b) Direct aggregator: SimpleFIN (self-host-friendly, paid), GoCardless/Nordigen (EU), Plaid (US, heavyweight), TrueLayer.
-  - (c) Both — manual file import + optional aggregator.
-- Manual entry + edit always available.
+- Transaction model: date, amount, payee, memo, account, category, tags, split children, attached receipt, original-currency + fx-rate fields.
+- **Import (v1):** file-based.
+  - Supported formats: **CSV** (per-bank profile), **OFX / QFX** where the bank offers it.
+  - **Per-bank CSV profiles** shipped at launch (schemas differ across Canadian banks):
+    - **Amex Canada** — CSV from the web portal.
+    - **CIBC** — CSV export (credit card + chequing have different layouts).
+    - **TD** — CSV (EasyWeb export).
+    - **RBC** — CSV (Online Banking export).
+    - **Scotiabank** — CSV.
+  - Each profile is a declarative mapping (columns → transaction fields, sign convention, date format, encoding) so new banks can be added without code changes.
+  - **De-duplication** on import: stable hash of (account, date, amount, normalized payee) + explicit "already imported" detection on re-upload.
+  - Manual entry + edit always available.
+- **Import (later milestone):** aggregator integration. Canadian coverage options: **Plaid** (has CA support for major banks), **Flinks** (Canadian-native), **MX**. SimpleFIN/GoCardless do not cover Canadian retail banks reliably. Decision deferred to M5.
 - **Categorization:**
   - Hierarchical categories (e.g. `Auto > Fuel`).
-  - Rule engine: match on payee/memo/amount/account → assign category + tags. Rules are re-runnable.
-  - **[OPEN]** Do we want YNAB-style envelope budgeting, or just category reporting?
-  - **[OPEN]** Splits (one transaction → multiple categories)?
-- Multi-currency — **[OPEN]** needed, or single-currency per instance?
+  - Rule engine: match on payee/memo/amount/account → assign category + tags. Rules are re-runnable over historical transactions.
+  - Splits supported — one transaction can be divided across multiple categories (needed for Costco-style mixed baskets).
+  - **[OPEN]** Budgeting style: plain category reporting, envelope/zero-based budgeting (YNAB-style), or both (envelopes as an optional layer on top of reporting)?
+- **Multi-currency:** primary currency **CAD**; transactions may carry a different `original_currency` + `fx_rate_at_time`. Reports default to CAD using stored rates; no live FX feed in v1.
 
 ### 3.2 Recurring Obligations ("Bills")
 - Bill = name, payee, amount (fixed or variable), cadence (monthly/quarterly/annual/custom), due day, account it pays from, optional auto-pay flag.
@@ -51,9 +66,9 @@ Security is a first-class pillar, not an afterthought (see §7).
 - Vendor/contractor contacts attachable to project or sub-task.
 
 ### 3.4 Maintenance Reminders
-- Recurring task: title, cadence (time-based: every N months; OR usage-based **[OPEN]** e.g. odometer), last-done date, next-due date, notes/checklist.
+- Recurring task: title, cadence (time-based: every N months; usage-based e.g. odometer km/miles is a stretch goal), last-done date, next-due date, notes/checklist.
 - Completing a task logs the completion (with optional cost → creates/links a transaction) and schedules the next occurrence.
-- **Notification channels** — **[OPEN]** In-app only? Email? Push via ntfy/Gotify? Matrix? Which is acceptable for a self-host audience?
+- **Notification channels** — **[OPEN]** In-app is guaranteed. Which additional channel(s) day one: email (SMTP), ntfy, Gotify, webhook? (Webhook falls out of the API pillar almost for free.)
 
 ### 3.5 Reporting
 - Monthly spend by category, trend lines, year-over-year.
@@ -68,49 +83,71 @@ Security is a first-class pillar, not an afterthought (see §7).
 - Receipt OCR (nice-to-have, later).
 - Mobile native apps (PWA is the mobile story unless stated otherwise).
 
-## 5. Architecture (proposed, pending stack decision)
+## 5. Architecture (proposed)
 
-- **Deployment target:** single `docker compose up` on a home server (Linux x86_64 + arm64). **[OPEN]** Confirm.
-- **Data store:** **[OPEN]** SQLite (simplest self-host, great for single-household) vs. Postgres (multi-user scale, more ops burden). Recommendation: SQLite with WAL; revisit if we ever need >1 node.
-- **Backend language/framework:** **[OPEN]** — see §9.
-- **Frontend:** **[OPEN]** SPA (React/Svelte) vs. server-rendered + HTMX. HTMX leans simpler for self-host; SPA better for PWA/offline.
-- **Background jobs:** recurring bill materialization, reminder scheduling, aggregator sync. In-process scheduler is fine for single-instance deploys.
-- **File storage:** local filesystem volume for attachments (S3 optional later).
-- **Config:** environment variables + a single config file; secrets via env or Docker secrets.
+- **Deployment target:** single `docker compose up` on a home server (Linux x86_64 + arm64). **[OPEN]** Any other targets that must work day one (Unraid app, TrueNAS SCALE, Kubernetes)?
+- **Data store:** **Postgres 16.** Multi-user + concurrent writes + JSONB for rule payloads + strong transactional guarantees justify the ops cost over SQLite.
+- **Backend:** see §9 for the proposed stack.
+- **Frontend:** SPA that consumes the same public REST API that external tools will use (see §5.1). This keeps a single API surface rather than a "private web API + public integration API" split.
+- **Background jobs:** recurring bill materialization, reminder dispatch, future aggregator sync, import processing. Single-process scheduler (e.g. Celery-beat, APScheduler, or framework-native) acceptable for household scale.
+- **File storage:** local filesystem volume for attachments, encrypted at rest (see §7.2). S3-compatible backend optional later.
+- **Config:** environment variables + optional file; secrets via env or Docker secrets.
+
+### 5.1 API as a First-Class Surface
+The user called out external integrations as a requirement, so the API is not an afterthought:
+- **REST + OpenAPI 3.1** schema generated from source of truth; schema served at `/api/schema` and rendered via Swagger UI / Redoc at `/api/docs`.
+- **Auth for API clients:** personal access tokens (PATs) scoped per-user, revocable, with optional scopes (`transactions:read`, `bills:write`, etc.). Session cookies used for the SPA; PATs for everything else.
+- **Versioning:** URL-prefixed (`/api/v1/...`). Breaking changes require a new version.
+- **Webhooks (outbound):** configurable HTTP callbacks on events (`transaction.imported`, `bill.overdue`, `maintenance.due`) with HMAC-signed payloads. Lets the app talk to Home Assistant, n8n, etc.
+- **Rate limiting** per token.
 
 ## 6. Data Model Sketch (informational)
 
-- `user` — id, email, password_hash, totp_secret_enc, roles.
-- `account` — id, name, type, institution, currency, starting_balance, closed_at.
-- `transaction` — id, account_id, date, amount, payee, memo, category_id, status, import_hash, receipt_id.
+- `household` — id, name, base_currency (default `CAD`).
+- `user` — id, household_id, email, password_hash, totp_secret_enc, role (`admin` / `member` / `viewer`), disabled_at.
+- `api_token` — id, user_id, name, token_hash, scopes, last_used_at, revoked_at.
+- `account` — id, household_id, name, type, institution, currency, starting_balance, closed_at.
+- `import_profile` — id, institution, format (`csv` / `ofx`), mapping_json (columns → fields, date fmt, sign convention).
+- `import_batch` — id, account_id, user_id, filename, sha256, row_count, created_at.
+- `transaction` — id, account_id, date, amount, original_currency, fx_rate, payee, memo, category_id, status, import_batch_id, import_hash, receipt_attachment_id.
 - `transaction_split` — parent_transaction_id, category_id, amount, memo.
-- `category` — id, parent_id, name, kind (income/expense/transfer).
-- `rule` — id, priority, match_json, action_json, enabled.
-- `bill` — id, name, payee, amount, cadence, next_due, account_id, autopay.
+- `category` — id, household_id, parent_id, name, kind (income / expense / transfer).
+- `rule` — id, household_id, priority, match_json, action_json, enabled.
+- `bill` — id, household_id, name, payee, amount, cadence, next_due, account_id, autopay.
 - `bill_instance` — id, bill_id, due_date, amount_expected, paid_transaction_id, status.
-- `project` — id, name, status, budget, notes.
-- `project_task` — id, project_id, title, status, est_cost, actual_cost, due_date.
-- `project_transaction_link` — project_id/task_id ↔ transaction_id.
-- `attachment` — id, owner_type, owner_id, filename, mime, size, sha256, path_or_blob, encrypted.
-- `maintenance_task` — id, title, cadence, last_done, next_due, checklist_json.
-- `audit_log` — id, user_id, at, action, entity, before_hash, after_hash, ip.
+- `project` — id, household_id, name, status, budget, notes.
+- `project_task` — id, project_id, title, status, est_cost, actual_cost, due_date, assignee_user_id.
+- `project_transaction_link` — project_id / task_id ↔ transaction_id.
+- `attachment` — id, owner_type, owner_id, filename, mime, size, sha256, encrypted_blob_ref, dek_enc (envelope-encryption wrap of data-encryption key).
+- `maintenance_task` — id, household_id, title, cadence, last_done, next_due, checklist_json.
+- `webhook` — id, household_id, url, secret_enc, event_mask, enabled.
+- `audit_log` — id, household_id, user_id, at, action, entity, before_hash, after_hash, ip, user_agent.
 
 ## 7. Security [SEC]
 
 Treated as a pillar. Baseline requirements:
 
 ### 7.1 AuthN / AuthZ
+- **Model:** one `household` per instance; each user belongs to a household and has a role.
+  - `admin` — manages users, accounts, categories, import profiles, webhooks, encryption-key rotation.
+  - `member` — full read/write on transactions, bills, projects, maintenance.
+  - `viewer` — read-only.
+  - **[OPEN] Data-sharing model:** all household members see all household data (simple, matches "shared finances" reality for most households) — **recommended** — OR per-account ACLs where some accounts can be hidden from other members (e.g. a partner's personal credit card)?
 - Password auth with Argon2id hashing.
-- **[OPEN]** Multi-user (household members with per-user roles) or single-user v1? This gates the whole auth model.
-- **Mandatory** TOTP (RFC 6238) for all users; optional WebAuthn/passkeys as a follow-up. **[OPEN]** Confirm TOTP-mandatory from day one.
+- TOTP (RFC 6238) **recommended mandatory from day one** for all users; WebAuthn/passkey support as a follow-up. **[OPEN]** Confirm TOTP is required, not optional.
+- API clients authenticate with personal access tokens (see §5.1), not password+TOTP.
 - Session tokens: HTTP-only, Secure, SameSite=Lax cookies; rotation on privilege change; idle + absolute timeouts.
-- Rate limiting + account lockout on login.
+- Rate limiting + progressive backoff on login (no hard lockout — avoids trivial DoS of a household member).
 
 ### 7.2 Data at Rest
-- DB file permissions 0600; container runs non-root.
-- **Field-level encryption** for sensitive columns: account numbers, aggregator access tokens, TOTP secrets, attachments containing PII. Key from env/KMS, not DB.
-- Attachments: **[OPEN]** encrypt at rest by default? (Leaning yes — these are receipts with account numbers and addresses.)
-- Backups: documented `sqlite3 .backup` / `pg_dump` workflow; encrypted before leaving the host. **[OPEN]** Bundled backup job, or leave to the operator?
+- Postgres runs in its own container; volume permissions locked to the DB user; app container non-root.
+- **Envelope encryption** for sensitive columns and all attachments:
+  - Master key (`APP_MASTER_KEY`) in env/Docker secret — "convenient" custody, as chosen.
+  - Per-row or per-file data-encryption keys (DEKs) encrypted by the master key, stored alongside the ciphertext.
+  - Sensitive columns: aggregator tokens (future), TOTP secrets, API-token hashes are already hashed, payees can be treated as PII in reports.
+  - Attachments encrypted at rest **by default** (receipts carry names, addresses, partial PANs). **[OPEN]** Confirm.
+- Key rotation: `APP_MASTER_KEY` rotatable via a maintenance command that re-wraps DEKs without touching ciphertext.
+- Backups: documented `pg_dump` workflow; a bundled `budgetapp backup` command produces an encrypted, timestamped artifact the operator can ship to off-host storage. **[OPEN]** Confirm the bundled command is wanted (vs. pure docs).
 
 ### 7.3 Data in Transit
 - HTTPS required. App refuses to start without TLS config OR an explicit `BEHIND_TLS_PROXY=1` flag (for Caddy/Traefik users). HSTS when terminating TLS itself.
@@ -130,9 +167,8 @@ Treated as a pillar. Baseline requirements:
 - Exportable activity log per user.
 
 ### 7.6 Threat Model (initial)
-- **In scope:** casual attacker on LAN, stolen laptop/backup, compromised dependency, XSS/CSRF/SQLi, malicious file upload.
-- **Out of scope v1:** nation-state, host-level compromise of the server itself (if root is owned, the DB key in env is owned too — documented limitation).
-- **[OPEN]** Should the master encryption key be held by the user (prompted at startup, never stored), accepting the UX cost of re-entry after reboot?
+- **In scope:** casual attacker on LAN, stolen laptop/backup, compromised dependency, XSS/CSRF/SQLi, malicious file upload, stolen API token.
+- **Out of scope v1:** nation-state, host-level compromise of the server itself. Because the master key lives in env (per the "convenient" choice), host-root = data compromise. This is an accepted, **documented** trade-off; paranoid mode (prompt-at-startup) can be added later behind a flag without breaking the data model.
 
 ## 8. Operational Concerns
 
@@ -141,37 +177,48 @@ Treated as a pillar. Baseline requirements:
 - Observability: structured logs, health endpoint, optional Prometheus metrics.
 - License: **[OPEN]** (AGPL-3.0 is typical for self-host-first projects; MIT if you want max adoption.)
 
-## 9. Open Stack Decisions
+## 9. Proposed Stack (needs confirmation)
 
-| Area | Options | Notes |
+Optimising for "robust + nice UI + API-first" with multi-user auth:
+
+| Area | Recommendation | Why |
 |---|---|---|
-| Backend | Go, Rust (Axum), Python (FastAPI/Django), TS (Node/Bun), Kotlin (Ktor) | Go & Rust give single-binary deploys; Django brings admin+auth batteries. |
-| Frontend | React, Svelte/SvelteKit, HTMX + server templates, Vue | HTMX easiest for self-host simplicity. |
-| DB | SQLite, Postgres | SQLite recommended for v1. |
-| Container runtime | Docker Compose, Podman | Compose primary; Podman-compatible. |
+| Backend | **Django 5 + Django REST Framework** | Mature, security-hardened defaults (CSRF, auth, password hashing, ORM). Multi-user, admin panel, migrations, permissions all built in. DRF produces clean REST APIs with auto OpenAPI. |
+| 2FA / MFA | **django-otp** (TOTP) + **django-webauthn** later | Maintained, integrates cleanly with Django sessions. |
+| Background jobs | **Celery + Redis** (or **django-q2** for simpler setup) | Reminder dispatch, webhook delivery, import parsing. |
+| Frontend | **SvelteKit** SPA consuming DRF | Less boilerplate than React, great DX, PWA-friendly. Same API external tools use → no duplication. |
+| DB | **Postgres 16** | Justified by multi-user + JSONB rule payloads. |
+| Attachments | Local volume, encrypted at rest | S3-compatible backend optional later. |
+| Container | **Docker Compose** (Podman-compatible) | Target for home servers. |
+
+**Alternatives** if you'd prefer:
+- **End-to-end TypeScript:** NestJS + Prisma + Postgres + SvelteKit. Slightly more "hand-built" on the security side (you wire auth/CSRF yourself rather than inheriting Django's defaults).
+- **Single binary:** Go (chi + sqlc) + SvelteKit built-in embed. Fewer moving parts at runtime, more security wiring up-front.
+
+**[OPEN]** Confirm Django+DRF+SvelteKit+Postgres, or pick one of the alternatives. If you have prior experience with one stack and not the others, that should drive the choice — self-hostable means *you* maintain it.
 
 ## 10. Milestones (tentative)
 
-1. **M0 – Foundations.** Auth (password + TOTP), user/account/category/transaction CRUD, CSV import, categorization rules.
-2. **M1 – Bills & forecast.** Recurring bills, matching, 30-day forecast.
-3. **M2 – Home projects.** Projects, tasks, attachments, transaction linking.
-4. **M3 – Maintenance.** Recurring tasks, notifications.
-5. **M4 – Reports & polish.** Trends, exports, PWA.
-6. **M5 – Optional aggregator.** Pick one of SimpleFIN/GoCardless/Plaid behind a feature flag.
+1. **M0 – Foundations.** Household + users + roles, password + TOTP auth, API tokens, account/category/transaction CRUD, CSV import with CIBC + TD + RBC + Scotia + Amex profiles, categorization rules, OpenAPI docs.
+2. **M1 – Bills & forecast.** Recurring bills, transaction-to-bill matching, 30/60/90-day cash-flow forecast.
+3. **M2 – Home projects.** Projects, sub-tasks, encrypted attachments, transaction linking, cost rollup.
+4. **M3 – Maintenance + notifications.** Recurring tasks, in-app notifications, at least one external channel (email or ntfy), outbound webhooks.
+5. **M4 – Reports & polish.** Trends, net-worth over time, CSV exports, PWA.
+6. **M5 – Aggregator (optional).** Evaluate Plaid vs. Flinks for Canadian bank coverage behind a feature flag.
 
 ---
 
-## Questions I Need Answered Before Going Deeper
+## Remaining Open Questions
 
-Please answer (or say "defer") for each:
+Resolved in rev 2: user model, import strategy, banks/region, encryption-key custody, multi-currency posture. What's still needed:
 
-1. **Users:** Single user, or multiple household members with separate logins? If multiple, does everyone see everything, or per-account permissions?
-2. **Transaction import:** File-only (CSV/OFX) for v1, or is an aggregator (SimpleFIN / GoCardless / Plaid) in scope? If aggregator, which region(s) do you bank in?
-3. **Budgeting style:** Plain category reporting, or envelope/zero-based budgeting (YNAB-style)?
-4. **Stack preference:** Any language/framework you already know and want to self-host, or should I recommend? Hard preferences on SQLite vs. Postgres, SPA vs. server-rendered?
-5. **Notifications:** In-app only OK for v1, or do you want email / push (ntfy, Gotify, etc.) from the start?
-6. **Encryption key custody:** Convenient (key in env, survives reboots) or paranoid (key entered at startup, app locked until you unlock it)?
-7. **Attachments:** Encrypt at rest by default — confirm yes?
-8. **Multi-currency:** Single currency per instance OK, or must support multiple?
-9. **License:** AGPL-3.0, MIT, something else, or defer?
-10. **Deployment:** Docker Compose on a home Linux box is the target — any other environment (Unraid, TrueNAS app, Kubernetes, bare metal) that must work on day one?
+1. **Household data-sharing model** — everyone in the household sees all data (recommended, matches shared-finances reality), or per-account ACLs so a member can hide a specific account from others?
+2. **Stack confirmation** — Django + DRF + SvelteKit + Postgres as proposed in §9, or one of the alternatives (NestJS+TS, or Go single-binary)? Your maintenance comfort matters more than my preference.
+3. **TOTP** — mandatory for all users from day one (recommended), or optional/opt-in?
+4. **Budgeting depth** — plain category reporting only, or envelope/zero-based budgeting (YNAB-style) on top of it?
+5. **Notifications** — besides in-app, which of {SMTP email, ntfy, Gotify, webhook} should ship in M3? (Webhook is nearly free given the API-first design.)
+6. **Attachments at rest** — encrypted by default (recommended, since receipts are PII-heavy) — confirm yes?
+7. **Bundled backup command** — include a `budgetapp backup` command that produces an encrypted dump, or leave backups entirely to the operator's `pg_dump`?
+8. **License** — AGPL-3.0 (typical for self-host-first), MIT (maximum adoption), something else, or defer?
+9. **Deployment targets besides Docker Compose** — anything else that must work on day one (Unraid, TrueNAS SCALE, Kubernetes, bare-metal systemd)?
+10. **Investment/brokerage accounts** — in scope for balance tracking only (no performance), or fully out for v1?
