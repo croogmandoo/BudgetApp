@@ -26,7 +26,9 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 WORKDIR /app
 
 # Copy project metadata first for cache-friendly dependency install.
-COPY pyproject.toml ./
+# README.md is referenced by pyproject.toml's [project].readme and hatchling
+# validates its presence during build, even for editable installs.
+COPY pyproject.toml README.md ./
 # Lock file is optional on initial scaffold; copy when present.
 COPY uv.loc[k] ./
 # Empty package directories so `uv pip install -e .` resolves before we copy
