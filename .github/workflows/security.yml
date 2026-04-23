@@ -184,14 +184,28 @@ jobs:
       - name: Build backend image
         run: docker build -t budgetapp-backend:ci ./backend
 
+      # aquasecurity/trivy-action@0.29.0 transitively pulls setup-trivy@v0.2.2
+      # which was yanked from the registry, so the action fails to resolve
+      # before any scan runs. Install Trivy directly from the pinned GitHub
+      # Release tarball instead — one less moving part and fully reproducible.
+      - name: Install Trivy
+        env:
+          TRIVY_VERSION: "0.58.1"
+        run: |
+          curl -fsSL -o /tmp/trivy.tar.gz \
+            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          tar -xzf /tmp/trivy.tar.gz -C /tmp trivy
+          sudo mv /tmp/trivy /usr/local/bin/trivy
+          trivy --version
+
       - name: Scan backend image with Trivy
-        uses: aquasecurity/trivy-action@18f2510ee396bbf400402947b394f2dd8c87dbb0 # 0.29.0
-        with:
-          image-ref: budgetapp-backend:ci
-          severity: CRITICAL,HIGH
-          exit-code: "1"
-          ignore-unfixed: true
-          vuln-type: os,library
+        run: |
+          trivy image \
+            --severity CRITICAL,HIGH \
+            --exit-code 1 \
+            --ignore-unfixed \
+            --vuln-type os,library \
+            budgetapp-backend:ci
 
   trivy-frontend-image:
     name: Trivy scan (frontend image)
@@ -209,11 +223,21 @@ jobs:
       - name: Build frontend image
         run: docker build -t budgetapp-frontend:ci ./frontend
 
+      - name: Install Trivy
+        env:
+          TRIVY_VERSION: "0.58.1"
+        run: |
+          curl -fsSL -o /tmp/trivy.tar.gz \
+            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          tar -xzf /tmp/trivy.tar.gz -C /tmp trivy
+          sudo mv /tmp/trivy /usr/local/bin/trivy
+          trivy --version
+
       - name: Scan frontend image with Trivy
-        uses: aquasecurity/trivy-action@18f2510ee396bbf400402947b394f2dd8c87dbb0 # 0.29.0
-        with:
-          image-ref: budgetapp-frontend:ci
-          severity: CRITICAL,HIGH
-          exit-code: "1"
-          ignore-unfixed: true
-          vuln-type: os,library
+        run: |
+          trivy image \
+            --severity CRITICAL,HIGH \
+            --exit-code 1 \
+            --ignore-unfixed \
+            --vuln-type os,library \
+            budgetapp-frontend:ci
