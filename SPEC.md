@@ -1,8 +1,8 @@
 # BudgetApp — Specification (Draft)
 
-> **Status:** Draft, revision 3. Sections marked **[OPEN]** need product decisions before implementation can start. Security-sensitive items are tagged **[SEC]**.
+> **Status:** Draft, revision 4. Sections marked **[OPEN]** need product decisions before implementation can start. Security-sensitive items are tagged **[SEC]**.
 
-## 0. Decisions Locked In (rev 3)
+## 0. Decisions Locked In (rev 4)
 
 - **Multi-user** household; **household-wide data visibility** — every member sees every shared account/debt/project (this instance exists for shared finances).
 - **Import:** file-based primary (CSV/OFX/QFX); aggregator (Plaid or Flinks for Canadian coverage) is M5.
@@ -11,6 +11,12 @@
 - **TOTP mandatory** for all users from day one.
 - **Budgeting model:** category reporting **plus** envelope/YNAB-style allocations layered on top (categories act as envelopes when a budget is set for a period; reports work either way).
 - **Encryption-key custody:** convenient — master key lives in env/secret, app starts unattended after reboot.
+- **Notifications:** all channels supported (in-app, SMTP email, ntfy, Gotify, outbound webhook). Every external channel is optional; the app functions normally if a channel is unconfigured or fails.
+- **Attachments encrypted at rest by default** (envelope-encrypted with per-file DEKs).
+- **Backup:** dedicated `budgetapp backup` / `budgetapp restore` commands plus operator docs for `pg_dump`.
+- **Investment/brokerage accounts:** balance-only in v1 (no holdings, performance, or tax-lot tracking).
+- **License:** **proprietary / all rights reserved** for now (no OSS license committed; the project is not being released publicly yet). Revisit at first public release — AGPL-3.0 is the natural pick for self-host-first; MIT/Apache-2.0 for permissive. Until then, every file stays copyright-holder's exclusive property.
+- **Deployment:** Docker Compose is the only supported target for v1. Kubernetes (Helm chart) is a post-v1 bonus, not a blocker.
 
 ## 1. Vision
 
@@ -33,7 +39,8 @@ Security is a first-class pillar, not an afterthought (see §7).
 ## 3. Functional Scope
 
 ### 3.1 Accounts & Transactions
-- Multiple accounts (checking, savings, credit card, cash, loan). **[OPEN]** Investment/brokerage accounts in scope?
+- Multiple accounts (checking, savings, credit card, cash, loan, investment — balance-only).
+- Investment accounts in v1 = a single balance that the user updates manually (monthly statement) or via CSV like any other account. **No holdings, performance, or tax-lot tracking in v1.**
 - Transaction model: date, amount, payee, memo, account, category, tags, split children, attached receipt, original-currency + fx-rate fields.
 - **Import (v1):** file-based.
   - Supported formats: **CSV** (per-bank profile), **OFX / QFX** where the bank offers it.
@@ -86,13 +93,24 @@ Opt-out: a household can ignore allocations entirely and still use categories fo
 ### 3.5 Maintenance Reminders
 - Recurring task: title, cadence (time-based: every N months; usage-based e.g. odometer km/miles is a stretch goal), last-done date, next-due date, notes/checklist.
 - Completing a task logs the completion (with optional cost → creates/links a transaction) and schedules the next occurrence.
-- **Notification channels** — **[OPEN]** In-app is guaranteed. Which additional channel(s) day one: email (SMTP), ntfy, Gotify, webhook? (Webhook falls out of the API pillar almost for free.)
+- Notifications for due/overdue tasks flow through the shared notification subsystem (see §3.7).
 
 ### 3.6 Reporting
 - Monthly spend by category, trend lines, year-over-year.
-- Net worth over time (accounts' running balances).
+- Net worth over time (accounts' running balances; includes investment-account manual balances).
 - Project totals (actual vs. budget).
+- Envelope status (allocated / spent / remaining / rolled over).
 - CSV export of any filtered transaction list.
+
+### 3.7 Notifications
+A single subsystem serves bills-due, maintenance-due, import-completed, envelope-overspent, webhook events, etc.
+
+- **Channels:** in-app (always on), **SMTP email**, **ntfy**, **Gotify**, **outbound webhook** (HMAC-signed).
+- **Every external channel is optional and non-breaking.** If SMTP is unconfigured, email notifications are silently skipped; other channels continue; the event still lands in the in-app inbox. A missing/failing channel never blocks the triggering action.
+- **Per-user preferences:** each user chooses which event types go to which channels (e.g. bills to email, maintenance to ntfy, webhooks go only where the admin configured them).
+- **Delivery guarantees:** at-least-once with retry + exponential backoff; dead-letter after N attempts, visible to admins.
+- **Adapter pattern** on the backend so new channels (Matrix, Slack, Discord) can be added without touching event producers.
+- **Webhook payloads** are signed with a per-webhook secret and include `event_type`, `occurred_at`, `entity_ref`, and a minimal data slice — receivers call the API for full detail if they need it (avoids leaking everything into every payload).
 
 ## 4. Non-Goals (initially)
 
@@ -103,7 +121,7 @@ Opt-out: a household can ignore allocations entirely and still use categories fo
 
 ## 5. Architecture (proposed)
 
-- **Deployment target:** single `docker compose up` on a home server (Linux x86_64 + arm64). **[OPEN]** Any other targets that must work day one (Unraid app, TrueNAS SCALE, Kubernetes)?
+- **Deployment target:** single `docker compose up` on a home server (Linux x86_64 + arm64). Kubernetes (Helm chart) is a post-v1 bonus, not a v1 target.
 - **Data store:** **Postgres 16.** Multi-user + concurrent writes + JSONB for rule payloads + strong transactional guarantees justify the ops cost over SQLite.
 - **Backend:** see §9 for the proposed stack.
 - **Frontend:** SPA that consumes the same public REST API that external tools will use (see §5.1). This keeps a single API surface rather than a "private web API + public integration API" split.
@@ -164,10 +182,13 @@ Treated as a pillar. Baseline requirements:
 - **Envelope encryption** for sensitive columns and all attachments:
   - Master key (`APP_MASTER_KEY`) in env/Docker secret — "convenient" custody, as chosen.
   - Per-row or per-file data-encryption keys (DEKs) encrypted by the master key, stored alongside the ciphertext.
-  - Sensitive columns: aggregator tokens (future), TOTP secrets, API-token hashes are already hashed, payees can be treated as PII in reports.
-  - Attachments encrypted at rest **by default** (receipts carry names, addresses, partial PANs). **[OPEN]** Confirm.
+  - Sensitive columns: aggregator tokens (future), TOTP secrets, webhook secrets. API tokens are stored as hashes only.
+  - **Attachments encrypted at rest by default** (receipts carry names, addresses, partial PANs). No plaintext-attachment mode.
 - Key rotation: `APP_MASTER_KEY` rotatable via a maintenance command that re-wraps DEKs without touching ciphertext.
-- Backups: documented `pg_dump` workflow; a bundled `budgetapp backup` command produces an encrypted, timestamped artifact the operator can ship to off-host storage. **[OPEN]** Confirm the bundled command is wanted (vs. pure docs).
+- **Backups:**
+  - Bundled `budgetapp backup [--output PATH]` command produces a single encrypted, timestamped tarball containing the DB dump + attachments + schema-version stamp + wrapped DEKs. Encryption uses `APP_MASTER_KEY` by default; a separate `--passphrase` flag allows a distinct key for the artifact so backups can be shared with a partner without sharing the running instance's master key.
+  - Matching `budgetapp restore PATH` refuses to overwrite a non-empty database without `--force`.
+  - Operator docs also cover the raw `pg_dump` path for users who want their own pipeline.
 
 ### 7.3 Data in Transit
 - HTTPS required. App refuses to start without TLS config OR an explicit `BEHIND_TLS_PROXY=1` flag (for Caddy/Traefik users). HSTS when terminating TLS itself.
@@ -192,10 +213,10 @@ Treated as a pillar. Baseline requirements:
 
 ## 8. Operational Concerns
 
-- First-run setup wizard: create admin user, enroll TOTP, set encryption key, choose import method.
-- Upgrade path: versioned migrations, pre-migration backup.
+- First-run setup wizard: create admin user, enforce TOTP enrollment, set encryption key, choose import method, optionally configure notification channels.
+- Upgrade path: versioned migrations, automatic pre-migration backup via `budgetapp backup`.
 - Observability: structured logs, health endpoint, optional Prometheus metrics.
-- License: **[OPEN]** (AGPL-3.0 is typical for self-host-first projects; MIT if you want max adoption.)
+- **License:** **Proprietary / all rights reserved** for v1. No OSS license file is committed while the project is not released publicly; every file defaults to the author's exclusive copyright. The README should state "Proprietary — all rights reserved" so it's unambiguous. Before any public release, pick: **AGPL-3.0** to keep modifications open for self-host-first, **MIT / Apache-2.0** for permissive adoption, or a **dual-license** model (AGPL + paid commercial).
 
 ## 9. Proposed Stack (needs confirmation)
 
@@ -219,22 +240,21 @@ Optimising for "robust + nice UI + API-first" with multi-user auth:
 
 ## 10. Milestones (tentative)
 
-1. **M0 – Foundations.** Household + users + roles, password + mandatory TOTP, API tokens, account/category/transaction CRUD, CSV import with CIBC + TD + RBC + Scotia + Amex profiles, categorization rules, OpenAPI docs.
+1. **M0 – Foundations.** Household + users + roles, password + mandatory TOTP, API tokens, account/category/transaction CRUD, CSV import with CIBC + TD + RBC + Scotia + Amex profiles, categorization rules, OpenAPI docs, `budgetapp backup`/`restore`.
 2. **M1 – Budgeting & bills.** Envelope allocations (category + rollover + transfers + to-be-budgeted), recurring bills, transaction-to-bill matching, 30/60/90-day cash-flow forecast.
 3. **M2 – Home projects.** Projects, sub-tasks, encrypted attachments, transaction linking, cost rollup.
-4. **M3 – Maintenance + notifications.** Recurring maintenance tasks, in-app notifications, at least one external channel (email or ntfy), outbound webhooks.
-5. **M4 – Reports & polish.** Trends, net-worth over time, CSV exports, PWA.
+4. **M3 – Maintenance + notifications.** Recurring maintenance tasks, full notification subsystem (in-app + SMTP + ntfy + Gotify + outbound webhook, all opt-in), per-user channel preferences.
+5. **M4 – Reports & polish.** Trends, net-worth over time, envelope reports, CSV exports, PWA.
 6. **M5 – Aggregator (optional).** Evaluate Plaid vs. Flinks for Canadian bank coverage behind a feature flag.
+7. **M6+ – Bonus.** Kubernetes Helm chart, WebAuthn/passkey auth, receipt OCR, usage-based maintenance cadence, investment holdings/performance.
 
 ---
 
 ## Remaining Open Questions
 
-Resolved in rev 3: sharing model, stack, TOTP, budgeting style (in addition to rev 2's user model, import, banks, key custody, currency). What's still needed:
+All product questions from prior revisions are resolved. What remains is implementation-time detail rather than open product decisions:
 
-1. **Notifications** — besides in-app, which of {SMTP email, ntfy, Gotify, webhook} should ship in M3? (Webhook is nearly free given the API-first design.)
-2. **Attachments at rest** — encrypted by default (recommended, since receipts are PII-heavy) — confirm yes?
-3. **Bundled backup command** — include a `budgetapp backup` command that produces an encrypted dump, or leave backups entirely to the operator's `pg_dump`?
-4. **License** — AGPL-3.0 (typical for self-host-first), MIT (maximum adoption), something else, or defer?
-5. **Deployment targets besides Docker Compose** — anything else that must work on day one (Unraid, TrueNAS SCALE, Kubernetes, bare-metal systemd)?
-6. **Investment/brokerage accounts** — in scope for balance tracking only (no performance), or fully out for v1?
+- **Per-bank CSV fixtures.** Each of CIBC, TD, RBC, Scotia, Amex Canada needs a real sample export to pin the import profile schema. These will be collected at the start of M0 and checked in as test fixtures (with PII scrubbed).
+- **Notification defaults.** What events are on-by-default in the in-app channel for a new user vs. opt-in only? Will finalise with the UX pass in M3.
+- **Envelope UX edge cases.** Behaviour when a period is "locked" (past month) and a late transaction posts — does it reopen the period, post as an adjustment, or require an explicit "reopen"? Will finalise in M1 with wire-frames.
+- **License selection** — deferred until first public release (see §8).
