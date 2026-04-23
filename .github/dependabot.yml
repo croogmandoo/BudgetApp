@@ -1,0 +1,61 @@
+version: 2
+
+# Weekly dependency updates across every ecosystem in the repo. Rebase strategy
+# is "auto" so Dependabot keeps PRs clean without human intervention. Action
+# pins are SHA-pinned in the workflows themselves; dependabot bumps them via
+# the github-actions ecosystem block below.
+updates:
+  - package-ecosystem: pip
+    directory: /backend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    target-branch: main
+    rebase-strategy: auto
+    labels:
+      - dependencies
+      - backend
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    target-branch: main
+    rebase-strategy: auto
+    labels:
+      - dependencies
+      - frontend
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    target-branch: main
+    rebase-strategy: auto
+    labels:
+      - dependencies
+      - ci
+
+  - package-ecosystem: docker
+    directory: /backend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    target-branch: main
+    rebase-strategy: auto
+    labels:
+      - dependencies
+      - docker
+
+  - package-ecosystem: docker
+    directory: /frontend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    target-branch: main
+    rebase-strategy: auto
+    labels:
+      - dependencies
+      - docker
