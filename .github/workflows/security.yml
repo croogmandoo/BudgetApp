@@ -26,12 +26,6 @@ jobs:
   codeql:
     name: CodeQL (${{ matrix.language }})
     runs-on: ubuntu-24.04
-    # CodeQL's analyze step uploads SARIF results to the GitHub Code Scanning
-    # API. That API is only open once Settings -> Code security -> Code
-    # scanning is enabled on this repo. Until then, the analysis runs fine
-    # but the upload 403s and fails the job. Mark non-blocking so PRs still
-    # pass; remove once the repo-level toggle is flipped.
-    continue-on-error: true
     permissions:
       security-events: write
       contents: read
@@ -67,9 +61,6 @@ jobs:
     # vulnerable or undesirably-licensed dependencies.
     if: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-24.04
-    # Requires Dependency graph to be enabled under Settings -> Code
-    # security. Non-blocking until that's on; flip back once available.
-    continue-on-error: true
     permissions:
       contents: read
       pull-requests: write
