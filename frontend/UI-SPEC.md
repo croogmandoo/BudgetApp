@@ -14,20 +14,20 @@
 
 All colors are defined as Tailwind theme extensions and CSS custom properties.
 
-| Token | Hex | Usage |
-|---|---|---|
-| `surface-0` | `#111210` | Page background |
-| `surface-1` | `#1a1918` | Sidebar, cards, panels |
-| `surface-2` | `#242220` | Hover states, input backgrounds, elevated surfaces |
-| `surface-3` | `#302e2b` | Borders, dividers, separators |
-| `ink-primary` | `#f2ede4` | Primary text (headings, values) |
-| `ink-secondary` | `#9a9389` | Secondary text, labels, placeholders |
-| `ink-muted` | `#5a5650` | Disabled state, very subtle text |
-| `accent` | `#c9a84c` | Brand gold — active nav, links, focus rings |
-| `positive` | `#5bbf8a` | Income, positive balances, success states |
-| `negative` | `#d9594c` | Expenses, overspent envelopes, error states |
-| `caution` | `#d4903a` | Due soon, nearly empty envelopes, warnings |
-| `info` | `#6b9fca` | Neutral informational, pending states |
+| Token           | Hex       | Usage                                              |
+| --------------- | --------- | -------------------------------------------------- |
+| `surface-0`     | `#111210` | Page background                                    |
+| `surface-1`     | `#1a1918` | Sidebar, cards, panels                             |
+| `surface-2`     | `#242220` | Hover states, input backgrounds, elevated surfaces |
+| `surface-3`     | `#302e2b` | Borders, dividers, separators                      |
+| `ink-primary`   | `#f2ede4` | Primary text (headings, values)                    |
+| `ink-secondary` | `#9a9389` | Secondary text, labels, placeholders               |
+| `ink-muted`     | `#5a5650` | Disabled state, very subtle text                   |
+| `accent`        | `#c9a84c` | Brand gold — active nav, links, focus rings        |
+| `positive`      | `#5bbf8a` | Income, positive balances, success states          |
+| `negative`      | `#d9594c` | Expenses, overspent envelopes, error states        |
+| `caution`       | `#d4903a` | Due soon, nearly empty envelopes, warnings         |
+| `info`          | `#6b9fca` | Neutral informational, pending states              |
 
 ### Semantic Usage Rules
 
@@ -40,13 +40,13 @@ All colors are defined as Tailwind theme extensions and CSS custom properties.
 
 ## Typography
 
-| Role | Font | Weight | Size | Usage |
-|---|---|---|---|---|
-| Display | Fraunces | 700 | 1.75rem–3rem | Page headings, net worth, big numbers |
-| Heading | Fraunces | 600 | 1.125rem–1.5rem | Section headings, card titles |
-| Body | DM Sans | 400 | 0.875rem | Body text, nav labels, descriptions |
-| Label | DM Sans | 500–600 | 0.75rem | Form labels, table headers, badges |
-| Data | JetBrains Mono | 400–500 | 0.8125rem–1rem | **All currency amounts, dates in tables, codes, IDs** |
+| Role    | Font           | Weight  | Size            | Usage                                                 |
+| ------- | -------------- | ------- | --------------- | ----------------------------------------------------- |
+| Display | Fraunces       | 700     | 1.75rem–3rem    | Page headings, net worth, big numbers                 |
+| Heading | Fraunces       | 600     | 1.125rem–1.5rem | Section headings, card titles                         |
+| Body    | DM Sans        | 400     | 0.875rem        | Body text, nav labels, descriptions                   |
+| Label   | DM Sans        | 500–600 | 0.75rem         | Form labels, table headers, badges                    |
+| Data    | JetBrains Mono | 400–500 | 0.8125rem–1rem  | **All currency amounts, dates in tables, codes, IDs** |
 
 ### Number Formatting Rules
 
@@ -70,10 +70,10 @@ All colors are defined as Tailwind theme extensions and CSS custom properties.
 
 ## Spacing & Layout
 
-| Breakpoint | Layout |
-|---|---|
-| `< 768px` (mobile) | No sidebar. Bottom tab bar (6 tabs). Full-width content. Top: page title + profile. |
-| `≥ 768px` (tablet+) | Left sidebar 224px fixed. Main content: fluid, `min-w-0`. |
+| Breakpoint          | Layout                                                                              |
+| ------------------- | ----------------------------------------------------------------------------------- |
+| `< 768px` (mobile)  | No sidebar. Bottom tab bar (6 tabs). Full-width content. Top: page title + profile. |
+| `≥ 768px` (tablet+) | Left sidebar 224px fixed. Main content: fluid, `min-w-0`.                           |
 
 **Content max-width:** `max-w-4xl` (56rem) for page content inside the main area.
 **Page padding:** `px-5 py-6` on desktop, `px-4 py-4` on mobile.
@@ -273,14 +273,14 @@ Colors: use semantic `*-bg` colors from color tokens (e.g., `positive/10` bg + `
 
 **Principle:** Intentional and restrained. Every animation serves communication.
 
-| Element | Animation | Duration / Easing |
-|---|---|---|
-| Page transition | Fade + 6px slide up | 200ms ease-out |
-| Row hover | Background color | 120ms ease |
-| Number update | Count-up (JS) on first render | 400ms ease-out |
-| Sidebar collapse (future) | Width + opacity | 200ms ease-in-out |
-| Form error | Shake | 200ms |
-| Toast/notification | Slide in from right | 250ms spring |
+| Element                   | Animation                     | Duration / Easing |
+| ------------------------- | ----------------------------- | ----------------- |
+| Page transition           | Fade + 6px slide up           | 200ms ease-out    |
+| Row hover                 | Background color              | 120ms ease        |
+| Number update             | Count-up (JS) on first render | 400ms ease-out    |
+| Sidebar collapse (future) | Width + opacity               | 200ms ease-in-out |
+| Form error                | Shake                         | 200ms             |
+| Toast/notification        | Slide in from right           | 250ms spring      |
 
 No bounce, no spring physics on structural elements. Micro-interactions only on data reveals and user feedback moments.
 
