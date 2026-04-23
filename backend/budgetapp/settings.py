@@ -7,7 +7,6 @@ SPEC.md §7 (Security) before it lands. Security is a pillar, not an afterthough
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Any
 
@@ -204,9 +203,7 @@ REST_FRAMEWORK: dict[str, Any] = {
         # TODO: add a custom scoped-PAT authentication class once
         # apps.accounts.APIToken lands.
     ),
-    "DEFAULT_PERMISSION_CLASSES": (
-        "rest_framework.permissions.IsAuthenticated",
-    ),
+    "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 50,

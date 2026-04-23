@@ -27,7 +27,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=8.3,<9.0",
+    "pytest>=9.0.3",
     "pytest-django>=4.8,<5.0",
     "pytest-cov>=5.0,<6.0",
     "ruff>=0.6,<1.0",
@@ -73,13 +73,17 @@ select = [
     "RUF",
 ]
 ignore = [
-    "S101",  # asserts ok in tests
+    "S101",    # asserts ok in tests
     "PLR0913",
+    # Django idioms that clash with these rules:
+    "RUF012",  # Django Meta.constraints / permissions are canonically lists
+    "PLC0415", # Django's manage.py puts import inside try/except by design
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "**/tests/**" = ["S", "PLR2004"]
 "**/settings.py" = ["S105", "S106"]
+"manage.py" = ["F401"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -113,7 +117,7 @@ disallow_untyped_defs = false
 django_settings_module = "budgetapp.settings"
 
 [tool.pytest.ini_options]
-DJANGO_SETTINGS_MODULE = "budgetapp.settings"
+DJANGO_SETTINGS_MODULE = "budgetapp.test_settings"
 python_files = ["tests.py", "test_*.py", "*_tests.py"]
 testpaths = ["apps"]
 addopts = [

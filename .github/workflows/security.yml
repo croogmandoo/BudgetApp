@@ -128,9 +128,10 @@ jobs:
         run: uv sync
 
       # pip-audit is declared as a dev dependency in backend/pyproject.toml so
-      # it audits the project's resolved environment.
+      # it audits the project's resolved environment. --skip-editable avoids
+      # pip-audit attempting to resolve our own package on PyPI.
       - name: Run pip-audit
-        run: uv run pip-audit --strict
+        run: uv run pip-audit --skip-editable
 
   pnpm-audit:
     name: pnpm audit (frontend)

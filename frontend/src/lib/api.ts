@@ -48,8 +48,7 @@ export interface RequestOptions {
 }
 
 function getBaseUrl(): string {
-  const fromEnv =
-    typeof import.meta !== 'undefined' ? import.meta.env?.VITE_API_URL : undefined;
+  const fromEnv = typeof import.meta !== 'undefined' ? import.meta.env?.VITE_API_URL : undefined;
   return (fromEnv ?? DEFAULT_BASE_URL).replace(/\/+$/, '');
 }
 
@@ -132,8 +131,7 @@ async function request<T>(
   const parsed = await parseBody(response);
 
   if (!response.ok) {
-    const errorBody =
-      parsed && typeof parsed === 'object' ? (parsed as ApiErrorBody) : null;
+    const errorBody = parsed && typeof parsed === 'object' ? (parsed as ApiErrorBody) : null;
     throw new ApiError(response.status, errorBody);
   }
 
@@ -141,8 +139,7 @@ async function request<T>(
 }
 
 export const api = {
-  get: <T>(path: string, options?: RequestOptions) =>
-    request<T>('GET', path, undefined, options),
+  get: <T>(path: string, options?: RequestOptions) => request<T>('GET', path, undefined, options),
   post: <T>(path: string, body?: unknown, options?: RequestOptions) =>
     request<T>('POST', path, body, options),
   patch: <T>(path: string, body?: unknown, options?: RequestOptions) =>

@@ -64,6 +64,9 @@ class Attachment(TimestampedModel):
             models.Index(fields=["sha256"]),
         ]
 
+    def __str__(self) -> str:
+        return f"{self.filename} ({self.owner_type}:{self.owner_id})"
+
 
 class AuditLog(models.Model):
     """Append-only record of security- and finance-relevant actions.
@@ -89,3 +92,6 @@ class AuditLog(models.Model):
             models.Index(fields=["household_id", "at"]),
             models.Index(fields=["entity", "at"]),
         ]
+
+    def __str__(self) -> str:
+        return f"{self.action} {self.entity} @ {self.at:%Y-%m-%d %H:%M:%S}"

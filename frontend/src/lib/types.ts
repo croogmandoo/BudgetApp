@@ -17,13 +17,7 @@ export type DecimalString = string;
 
 export type Role = 'admin' | 'member' | 'viewer';
 
-export type AccountType =
-  | 'checking'
-  | 'savings'
-  | 'credit_card'
-  | 'cash'
-  | 'loan'
-  | 'investment';
+export type AccountType = 'checking' | 'savings' | 'credit_card' | 'cash' | 'loan' | 'investment';
 
 export type CategoryKind = 'income' | 'expense' | 'transfer';
 
