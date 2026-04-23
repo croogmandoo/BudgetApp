@@ -10,7 +10,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     UV_LINK_MODE=copy \
     UV_COMPILE_BYTECODE=1 \
-    UV_PYTHON_DOWNLOADS=never
+    UV_PYTHON_DOWNLOADS=never \
+    # Tell uv which venv to target so both `uv pip install` and `uv sync`
+    # use /opt/venv rather than auto-discovering (or creating) .venv.
+    VIRTUAL_ENV=/opt/venv \
+    PATH="/opt/venv/bin:$PATH"
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -31,19 +35,20 @@ WORKDIR /app
 COPY pyproject.toml README.md ./
 # Lock file is optional on initial scaffold; copy when present.
 COPY uv.loc[k] ./
-# Empty package directories so `uv pip install -e .` resolves before we copy
-# the real source in the runtime stage.
+# Stub package dirs so uv can resolve the project metadata before we copy
+# the real source (which lands in the runtime stage).
 RUN mkdir -p budgetapp apps \
     && touch budgetapp/__init__.py apps/__init__.py
 
-# Install into an explicit venv path without sourcing the bash-only
-# activate script (RUN defaults to /bin/sh, which on Debian-slim is dash
-# and chokes on the activate script's bash-specific syntax).
 RUN uv venv /opt/venv \
     && if [ -f uv.lock ]; then \
          uv sync --no-dev --frozen; \
        else \
-         uv pip install --python /opt/venv/bin/python -e .; \
+         # Non-editable install: copies package stubs into site-packages and
+         # installs all declared runtime deps (uvicorn, celery, Django, …).
+         # The real source at /app takes priority over site-packages at runtime
+         # because Python searches CWD (WORKDIR=/app) before site-packages.
+         uv pip install .; \
        fi
 
 # ---------------------------------------------------------------------------
