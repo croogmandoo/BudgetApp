@@ -29,10 +29,20 @@ WORKDIR /app
 COPY pyproject.toml ./
 # Lock file is optional on initial scaffold; copy when present.
 COPY uv.loc[k] ./
+# Empty package directories so `uv pip install -e .` resolves before we copy
+# the real source in the runtime stage.
+RUN mkdir -p budgetapp apps \
+    && touch budgetapp/__init__.py apps/__init__.py
 
+# Install into an explicit venv path without sourcing the bash-only
+# activate script (RUN defaults to /bin/sh, which on Debian-slim is dash
+# and chokes on the activate script's bash-specific syntax).
 RUN uv venv /opt/venv \
-    && . /opt/venv/bin/activate \
-    && uv sync --no-dev --frozen || uv pip install --python /opt/venv/bin/python -e .
+    && if [ -f uv.lock ]; then \
+         uv sync --no-dev --frozen; \
+       else \
+         uv pip install --python /opt/venv/bin/python -e .; \
+       fi
 
 # ---------------------------------------------------------------------------
 # Stage 2: runtime image.
