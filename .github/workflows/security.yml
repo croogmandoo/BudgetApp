@@ -92,12 +92,27 @@ jobs:
           # Gitleaks needs full history to scan commits.
           fetch-depth: 0
 
-      - name: Run gitleaks
-        uses: gitleaks/gitleaks-action@83373cf2f8c4db6e24b41f1a0318c6d9d7bf0148 # v2.3.7
+      # gitleaks/gitleaks-action's v2.3.7 SHA the scaffold picked does not
+      # resolve in GitHub's action ref DB, so the job fails to schedule.
+      # Install the upstream binary directly, same pattern as Trivy.
+      - name: Install gitleaks
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Keep PR noise down; rely on the job status / summary instead.
-          GITLEAKS_ENABLE_COMMENTS: false
+          GITLEAKS_VERSION: "8.21.2"
+        run: |
+          curl -fsSL -o /tmp/gitleaks.tar.gz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          tar -xzf /tmp/gitleaks.tar.gz -C /tmp gitleaks
+          sudo mv /tmp/gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+
+      - name: Run gitleaks
+        run: |
+          gitleaks detect \
+            --source . \
+            --config .gitleaks.toml \
+            --redact \
+            --no-banner \
+            --verbose
 
   pip-audit:
     name: pip-audit (backend)
@@ -151,6 +166,8 @@ jobs:
 
       - name: Install pnpm
         uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d # v4.0.0
+        with:
+          package_json_file: frontend/package.json
 
       - name: Install Node 20
         uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
