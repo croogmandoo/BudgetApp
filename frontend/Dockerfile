@@ -16,10 +16,10 @@ RUN corepack enable
 COPY package.json pnpm-lock.yaml* ./
 RUN pnpm install
 
-# Build the app.
+# Build the app. @sveltejs/adapter-node emits a self-contained build/ dir
+# that only needs Node at runtime; node_modules stays in the builder stage.
 COPY . .
-RUN pnpm build \
-    && pnpm prune --prod
+RUN pnpm build
 
 # ---------- runtime ----------
 FROM node:20-alpine AS runtime
@@ -33,10 +33,13 @@ ENV NODE_ENV=production \
     PORT=3000 \
     HOST=0.0.0.0
 
+# Only the adapter-node output is required at runtime. Leaving node_modules,
+# pnpm-lock.yaml, and the pnpm symlink farm out of the final image removes
+# the build-tooling surface (esbuild native binary, tar, minimatch, glob,
+# cross-spawn, etc.) that Trivy flagged with HIGH/CRITICAL findings.
+# package.json is kept so Node picks up "type": "module".
 COPY --from=builder --chown=app:app /app/build ./build
-COPY --from=builder --chown=app:app /app/node_modules ./node_modules
 COPY --from=builder --chown=app:app /app/package.json ./package.json
-COPY --from=builder --chown=app:app /app/pnpm-lock.yaml ./pnpm-lock.yaml
 
 USER app
 
