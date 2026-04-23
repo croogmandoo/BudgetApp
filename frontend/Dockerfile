@@ -26,6 +26,16 @@ FROM node:20-alpine AS runtime
 
 WORKDIR /app
 
+# node:20-alpine ships with npm preinstalled at /usr/local/lib/node_modules/npm.
+# npm itself bundles cross-spawn, glob, minimatch, tar, and other transitives
+# that Trivy flags with HIGH findings every time a new CVE lands. We run the
+# adapter-node bundle with plain `node`, so npm and corepack are dead weight.
+RUN rm -rf /usr/local/lib/node_modules/npm \
+           /usr/local/bin/npm \
+           /usr/local/bin/npx \
+           /usr/local/lib/node_modules/corepack \
+           /usr/local/bin/corepack
+
 # Run as a non-root user.
 RUN addgroup -S app && adduser -S app -G app
 
