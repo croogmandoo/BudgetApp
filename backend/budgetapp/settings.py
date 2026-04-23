@@ -146,6 +146,10 @@ ASGI_APPLICATION = "budgetapp.asgi.application"
 # ---------------------------------------------------------------------------
 
 DATABASE_URL: str = env.str("DATABASE_URL", default="")
+# dj_database_url.parse() returns a DBConfig TypedDict which mypy reads
+# as incompatible with the dict[str, Any] shape Django expects here.
+# Annotating widens the mapping value type so both branches type-check.
+DATABASES: dict[str, Any]
 if not DATABASE_URL:
     if DEBUG:
         # SQLite fallback is acceptable for the bootstrap phase only.

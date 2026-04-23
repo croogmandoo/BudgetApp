@@ -31,7 +31,11 @@ dev = [
     "pytest-django>=4.8,<5.0",
     "pytest-cov>=5.0,<6.0",
     "ruff>=0.6,<1.0",
-    "mypy>=1.11,<2.0",
+    # mypy 1.20 crashes inside django-stubs 6.0.x's NewSemanalDjangoPlugin
+    # constructor. Cap below 1.20 until django-stubs ships a compatible
+    # release. Bump the cap (and re-run 'uv run mypy .') when Dependabot
+    # offers a newer django-stubs.
+    "mypy>=1.11,<1.20",
     "django-stubs[compatible-mypy]>=5.0",
     "djangorestframework-stubs[compatible-mypy]>=3.15",
     "pip-audit>=2.7,<3.0",
@@ -100,6 +104,10 @@ disallow_incomplete_defs = true
 no_implicit_optional = true
 check_untyped_defs = true
 show_error_codes = true
+# Don't fail on third-party modules that ship without py.typed
+# (celery, django-environ, django-otp). Any module we own is still
+# subject to every strict check.
+disable_error_code = ["import-untyped"]
 plugins = [
     "mypy_django_plugin.main",
     "mypy_drf_plugin.main",
@@ -113,8 +121,25 @@ exclude = [
 module = "tests.*"
 disallow_untyped_defs = false
 
+# Third-party modules without py.typed / stubs. Dropping import-untyped
+# for these lets mypy still validate our own code instead of bailing on
+# the first transitive import.
+[[tool.mypy.overrides]]
+module = [
+    "celery",
+    "celery.*",
+    "environ",
+    "environ.*",
+    "django_otp",
+    "django_otp.*",
+]
+ignore_missing_imports = true
+
 [tool.django-stubs]
-django_settings_module = "budgetapp.settings"
+# Use the test settings so mypy does not trip the "SECRET_KEY required"
+# guard in settings.py. The test module forces DJANGO_DEBUG=1, then
+# re-exports the real settings.
+django_settings_module = "budgetapp.test_settings"
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "budgetapp.test_settings"

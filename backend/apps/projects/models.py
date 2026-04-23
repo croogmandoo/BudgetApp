@@ -102,7 +102,7 @@ class ProjectTransactionLink(TimestampedModel):
     class Meta:
         constraints = [
             models.CheckConstraint(
-                check=(
+                condition=(
                     models.Q(project__isnull=False, task__isnull=True)
                     | models.Q(project__isnull=True, task__isnull=False)
                 ),
