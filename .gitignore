@@ -45,6 +45,9 @@ Thumbs.db
 # Local AI assistant memory — personal to each developer's session.
 .claude/
 
+# --- Git worktrees -----------------------------------------------------------
+.worktrees/
+
 # --- Docker ------------------------------------------------------------------
 # Operator-specific overrides shouldn't be committed. The base compose file is.
 docker-compose.override.yml
