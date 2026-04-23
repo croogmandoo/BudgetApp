@@ -43,9 +43,8 @@ jobs:
       - name: Install Python 3.12
         run: uv python install 3.12
 
-      # NOTE: switch to `uv sync --frozen` once backend/uv.lock is committed.
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --all-extras --frozen
 
       - name: Ruff lint
         run: uv run ruff check .
@@ -88,9 +87,8 @@ jobs:
           cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
 
-      # NOTE: switch to `pnpm install --frozen-lockfile` once frontend/pnpm-lock.yaml lands.
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Lint
         run: pnpm lint

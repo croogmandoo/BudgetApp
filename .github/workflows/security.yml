@@ -125,7 +125,7 @@ jobs:
         run: uv python install 3.12
 
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --all-extras --frozen
 
       # pip-audit is declared as a dev dependency in backend/pyproject.toml so
       # it audits the project's resolved environment. --skip-editable avoids
@@ -160,7 +160,7 @@ jobs:
           cache-dependency-path: frontend/pnpm-lock.yaml
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       # `--prod` restricts the audit to runtime dependencies; dev deps (ESLint
       # plugins, Vitest, etc.) have a long tail of advisories that don't reach

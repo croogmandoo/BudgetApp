@@ -27,4 +27,9 @@ paths = [
 ]
 regexes = [
     '''REPLACE_ME_[A-Z0-9_]+''',
+    # Dev-only SECRET_KEY placeholder that appeared in early scaffold commits
+    # before the settings module switched to secrets.token_urlsafe() at runtime.
+    # Gitleaks still sees it in git history even though it is no longer present
+    # in the tree.
+    '''insecure-dev-only-not-for-production''',
 ]
