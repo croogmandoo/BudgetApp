@@ -127,11 +127,8 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
-      # Assumes pip-audit is declared as a dev dependency in backend/pyproject.toml
-      # so it audits the project's resolved environment. If the backend subagent
-      # has not yet added pip-audit to the dev extras, this step will fail loudly
-      # and the fix is a one-line addition to pyproject.toml rather than reworking
-      # this job. TODO: verify pip-audit is in the dev dependency group.
+      # pip-audit is declared as a dev dependency in backend/pyproject.toml so
+      # it audits the project's resolved environment.
       - name: Run pip-audit
         run: uv run pip-audit --strict
 
@@ -164,8 +161,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
+      # `--prod` restricts the audit to runtime dependencies; dev deps (ESLint
+      # plugins, Vitest, etc.) have a long tail of advisories that don't reach
+      # users. Revisit if we ever ship dev-tooling to end users.
       - name: Run pnpm audit
-        run: pnpm audit --audit-level=high
+        run: pnpm audit --prod --audit-level=high
 
   trivy-backend-image:
     name: Trivy scan (backend image)

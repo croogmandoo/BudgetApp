@@ -1,0 +1,30 @@
+# Gitleaks configuration.
+#
+# We extend the default ruleset but allowlist two safe patterns that would
+# otherwise trigger on the initial scaffold:
+#
+#   1. `.env.example` is a template committed to git with placeholder values.
+#      It contains a DATABASE_URL of the form `postgres://<user>:<password>@...`
+#      whose literal is `REPLACE_ME_...` but the URI shape matches the default
+#      "password in URL" rule.
+#   2. Any `REPLACE_ME_<SNAKE_CASE>` token is a documented placeholder. Real
+#      secrets never match this shape.
+#
+# Review this file (and the allowlists) before adding new entries — the bar
+# for silencing a rule should be "the match is structurally incapable of
+# being a real secret", not "the match is annoying".
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Env example template with placeholder credentials"
+paths = [
+    '''\.env\.example$''',
+]
+
+[[allowlists]]
+description = "REPLACE_ME_<SNAKE_CASE> placeholder markers"
+regexes = [
+    '''REPLACE_ME_[A-Z0-9_]+''',
+]

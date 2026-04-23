@@ -9,9 +9,12 @@ WORKDIR /app
 # Enable pnpm via corepack (pinned through the "packageManager" field in package.json).
 RUN corepack enable
 
-# Install dependencies first for better layer caching.
-COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
+# Install dependencies first for better layer caching. The wildcard on the
+# lockfile lets the initial scaffold build before pnpm-lock.yaml lands; once
+# the lockfile is committed, pnpm will respect it automatically. Switch to
+# `pnpm install --frozen-lockfile` after the lockfile is in the repo.
+COPY package.json pnpm-lock.yaml* ./
+RUN pnpm install
 
 # Build the app.
 COPY . .

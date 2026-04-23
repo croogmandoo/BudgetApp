@@ -28,12 +28,15 @@ environ.Env.read_env(BASE_DIR / ".env")
 
 DEBUG: bool = env.bool("DJANGO_DEBUG", default=False)
 
-# SECRET_KEY must be provided in production; generate one locally for DEBUG only.
+# SECRET_KEY must be provided in production. In DEBUG, we generate a random
+# ephemeral key so tests and local runs work without requiring env setup;
+# sessions will not survive process restarts, which is fine for dev.
 SECRET_KEY: str = env.str("DJANGO_SECRET_KEY", default="")
 if not SECRET_KEY:
     if DEBUG:
-        # Deterministic-looking dev-only placeholder. Never deploy with this.
-        SECRET_KEY = "insecure-dev-only-not-for-production"
+        import secrets as _secrets
+
+        SECRET_KEY = _secrets.token_urlsafe(50)
     else:
         raise RuntimeError(
             "DJANGO_SECRET_KEY is required when DJANGO_DEBUG is False. "
