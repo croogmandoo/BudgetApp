@@ -1,3 +1,75 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html,
+  body {
+    @apply bg-surface-0 text-ink-primary font-sans;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+@layer components {
+  /* Monospaced number utilities — apply to all currency and date values */
+  .num {
+    @apply font-mono tabular-nums tracking-tight;
+  }
+  .num-pos {
+    @apply font-mono tabular-nums tracking-tight text-positive;
+  }
+  .num-neg {
+    @apply font-mono tabular-nums tracking-tight text-negative;
+  }
+  .num-warn {
+    @apply font-mono tabular-nums tracking-tight text-caution;
+  }
+
+  /* Standard card surface */
+  .card {
+    @apply bg-surface-1 border border-surface-3 rounded-lg shadow-card;
+  }
+
+  /* Category pill badge */
+  .pill {
+    @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium;
+  }
+
+  /* Primary action button */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded bg-accent px-4 py-2 text-sm font-medium text-surface-0 transition-opacity duration-150 hover:opacity-90 active:opacity-80 disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+
+  /* Ghost/secondary button */
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded border border-surface-3 px-4 py-2 text-sm font-medium text-ink-secondary transition-colors duration-150 hover:bg-surface-2 hover:text-ink-primary disabled:opacity-40;
+  }
+
+  /* Form input */
+  .input {
+    @apply w-full rounded border border-surface-3 bg-surface-2 px-3 py-2 text-sm text-ink-primary placeholder:text-ink-muted transition-colors duration-150
+      focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30;
+  }
+
+  /* Form label */
+  .label {
+    @apply mb-1 block text-xs font-medium text-ink-secondary;
+  }
+}
+
+/* Reduced-motion: disable animations */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
