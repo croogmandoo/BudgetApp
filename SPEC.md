@@ -1,13 +1,15 @@
 # BudgetApp — Specification (Draft)
 
-> **Status:** Draft, revision 2. Sections marked **[OPEN]** need product decisions before implementation can start. Security-sensitive items are tagged **[SEC]**.
+> **Status:** Draft, revision 3. Sections marked **[OPEN]** need product decisions before implementation can start. Security-sensitive items are tagged **[SEC]**.
 
-## 0. Decisions Locked In (rev 2)
+## 0. Decisions Locked In (rev 3)
 
-- **Multi-user** household, separate logins per member (sharing model for data still **[OPEN]**, see §7.1).
-- **Import:** file-based primary (CSV/OFX/QFX), aggregator is a later milestone.
-- **Banks targeted at launch:** Amex Canada, CIBC, TD, RBC, Scotiabank. Primary currency **CAD**; USD transactions must round-trip cleanly (common on Amex and cross-border spend).
-- **Stack bias:** "robust" + nice UI + first-class API for external integrations (see §9 for the proposed stack, still pending confirmation).
+- **Multi-user** household; **household-wide data visibility** — every member sees every shared account/debt/project (this instance exists for shared finances).
+- **Import:** file-based primary (CSV/OFX/QFX); aggregator (Plaid or Flinks for Canadian coverage) is M5.
+- **Banks targeted at launch:** Amex Canada, CIBC, TD, RBC, Scotiabank. Primary currency **CAD**; USD transactions must round-trip cleanly.
+- **Stack:** **Django 5 + Django REST Framework + SvelteKit + Postgres 16**, delivered as a Docker Compose stack (app + db + redis/worker containers).
+- **TOTP mandatory** for all users from day one.
+- **Budgeting model:** category reporting **plus** envelope/YNAB-style allocations layered on top (categories act as envelopes when a budget is set for a period; reports work either way).
 - **Encryption-key custody:** convenient — master key lives in env/secret, app starts unattended after reboot.
 
 ## 1. Vision
@@ -49,28 +51,44 @@ Security is a first-class pillar, not an afterthought (see §7).
   - Hierarchical categories (e.g. `Auto > Fuel`).
   - Rule engine: match on payee/memo/amount/account → assign category + tags. Rules are re-runnable over historical transactions.
   - Splits supported — one transaction can be divided across multiple categories (needed for Costco-style mixed baskets).
-  - **[OPEN]** Budgeting style: plain category reporting, envelope/zero-based budgeting (YNAB-style), or both (envelopes as an optional layer on top of reporting)?
 - **Multi-currency:** primary currency **CAD**; transactions may carry a different `original_currency` + `fx_rate_at_time`. Reports default to CAD using stored rates; no live FX feed in v1.
 
-### 3.2 Recurring Obligations ("Bills")
+### 3.2 Budgeting (Categories + Envelopes)
+Two layers, both always available:
+
+1. **Category reporting** (passive) — every transaction has a category; reports aggregate spend by category and period.
+2. **Envelope budgeting** (active) — for each monthly period, an amount can be allocated to a category ("envelope"). That category then has a running balance = carry-in + allocations − spend.
+
+Rules:
+- Period = calendar month, household timezone.
+- Categories have an `is_budgetable` flag. Non-budgetable categories (e.g. `Transfers`, `Reimbursements`) never draw from an envelope.
+- **Rollover behaviour per category:** `carry_positive` (unspent rolls forward — default for sinking funds like `Auto > Maintenance`), `carry_negative` (overspend rolls forward as a debt against next month — default for typical spending), or `reset` (balance zeroes each month — default for allowances).
+- **Moving money between envelopes** is a first-class action with its own audit record; doesn't create a fake transaction.
+- **Income flow:** income transactions add to a pool ("to-be-budgeted") until the user allocates them. The top bar always shows to-be-budgeted so it can't be silently overspent.
+- Splits respect envelopes: each split draws from its own category's envelope.
+- Reports: both "spend by category" (reporting mode) and "envelope status this month" (budgeting mode) views.
+
+Opt-out: a household can ignore allocations entirely and still use categories for reporting — envelopes only activate when an allocation is set.
+
+### 3.3 Recurring Obligations ("Bills")
 - Bill = name, payee, amount (fixed or variable), cadence (monthly/quarterly/annual/custom), due day, account it pays from, optional auto-pay flag.
 - Monthly view: expected vs. paid, overdue highlights.
 - **Matching:** when a transaction comes in that matches a bill (payee + amount range + date window), mark the bill paid and link the transaction. Manual override always available.
 - Projection: upcoming 30/60/90-day cash-flow forecast from recurring bills + scheduled income.
 
-### 3.3 Home Projects
+### 3.4 Home Projects
 - Project = name, status (planned/active/done/abandoned), budget, start/end dates, notes.
 - Sub-tasks with status, estimated cost, actual cost, assignee (if multi-user), due date.
 - **Cost rollup:** sum of sub-task actuals + directly-linked transactions.
 - Attachments: receipts, quotes, photos, PDFs. **[SEC]** Stored locally by default; see §7 on encryption.
 - Vendor/contractor contacts attachable to project or sub-task.
 
-### 3.4 Maintenance Reminders
+### 3.5 Maintenance Reminders
 - Recurring task: title, cadence (time-based: every N months; usage-based e.g. odometer km/miles is a stretch goal), last-done date, next-due date, notes/checklist.
 - Completing a task logs the completion (with optional cost → creates/links a transaction) and schedules the next occurrence.
 - **Notification channels** — **[OPEN]** In-app is guaranteed. Which additional channel(s) day one: email (SMTP), ntfy, Gotify, webhook? (Webhook falls out of the API pillar almost for free.)
 
-### 3.5 Reporting
+### 3.6 Reporting
 - Monthly spend by category, trend lines, year-over-year.
 - Net worth over time (accounts' running balances).
 - Project totals (actual vs. budget).
@@ -111,7 +129,10 @@ The user called out external integrations as a requirement, so the API is not an
 - `import_batch` — id, account_id, user_id, filename, sha256, row_count, created_at.
 - `transaction` — id, account_id, date, amount, original_currency, fx_rate, payee, memo, category_id, status, import_batch_id, import_hash, receipt_attachment_id.
 - `transaction_split` — parent_transaction_id, category_id, amount, memo.
-- `category` — id, household_id, parent_id, name, kind (income / expense / transfer).
+- `category` — id, household_id, parent_id, name, kind (income / expense / transfer), is_budgetable, rollover_mode (`carry_positive` / `carry_negative` / `reset`).
+- `budget_period` — id, household_id, month (date, first-of-month), locked_at.
+- `budget_allocation` — id, period_id, category_id, amount. Uniqueness on (period_id, category_id).
+- `budget_transfer` — id, period_id, from_category_id, to_category_id, amount, memo, user_id, at. (Audit-visible "move money between envelopes".)
 - `rule` — id, household_id, priority, match_json, action_json, enabled.
 - `bill` — id, household_id, name, payee, amount, cadence, next_due, account_id, autopay.
 - `bill_instance` — id, bill_id, due_date, amount_expected, paid_transaction_id, status.
@@ -128,13 +149,12 @@ The user called out external integrations as a requirement, so the API is not an
 Treated as a pillar. Baseline requirements:
 
 ### 7.1 AuthN / AuthZ
-- **Model:** one `household` per instance; each user belongs to a household and has a role.
+- **Model:** one `household` per instance; each user belongs to a household and has a role. **Data visibility is household-wide** — every member sees every shared account, bill, project, and envelope. No per-account hiding in v1.
   - `admin` — manages users, accounts, categories, import profiles, webhooks, encryption-key rotation.
-  - `member` — full read/write on transactions, bills, projects, maintenance.
+  - `member` — full read/write on transactions, bills, projects, maintenance, budgets.
   - `viewer` — read-only.
-  - **[OPEN] Data-sharing model:** all household members see all household data (simple, matches "shared finances" reality for most households) — **recommended** — OR per-account ACLs where some accounts can be hidden from other members (e.g. a partner's personal credit card)?
 - Password auth with Argon2id hashing.
-- TOTP (RFC 6238) **recommended mandatory from day one** for all users; WebAuthn/passkey support as a follow-up. **[OPEN]** Confirm TOTP is required, not optional.
+- **TOTP (RFC 6238) is mandatory** for all users from first login. WebAuthn/passkey support follows later.
 - API clients authenticate with personal access tokens (see §5.1), not password+TOTP.
 - Session tokens: HTTP-only, Secure, SameSite=Lax cookies; rotation on privilege change; idle + absolute timeouts.
 - Rate limiting + progressive backoff on login (no hard lockout — avoids trivial DoS of a household member).
@@ -195,14 +215,14 @@ Optimising for "robust + nice UI + API-first" with multi-user auth:
 - **End-to-end TypeScript:** NestJS + Prisma + Postgres + SvelteKit. Slightly more "hand-built" on the security side (you wire auth/CSRF yourself rather than inheriting Django's defaults).
 - **Single binary:** Go (chi + sqlc) + SvelteKit built-in embed. Fewer moving parts at runtime, more security wiring up-front.
 
-**[OPEN]** Confirm Django+DRF+SvelteKit+Postgres, or pick one of the alternatives. If you have prior experience with one stack and not the others, that should drive the choice — self-hostable means *you* maintain it.
+**Confirmed** (rev 3): Django 5 + DRF + SvelteKit + Postgres 16, delivered as a Docker Compose stack (separate containers: `app`, `worker`, `postgres`, `redis`).
 
 ## 10. Milestones (tentative)
 
-1. **M0 – Foundations.** Household + users + roles, password + TOTP auth, API tokens, account/category/transaction CRUD, CSV import with CIBC + TD + RBC + Scotia + Amex profiles, categorization rules, OpenAPI docs.
-2. **M1 – Bills & forecast.** Recurring bills, transaction-to-bill matching, 30/60/90-day cash-flow forecast.
+1. **M0 – Foundations.** Household + users + roles, password + mandatory TOTP, API tokens, account/category/transaction CRUD, CSV import with CIBC + TD + RBC + Scotia + Amex profiles, categorization rules, OpenAPI docs.
+2. **M1 – Budgeting & bills.** Envelope allocations (category + rollover + transfers + to-be-budgeted), recurring bills, transaction-to-bill matching, 30/60/90-day cash-flow forecast.
 3. **M2 – Home projects.** Projects, sub-tasks, encrypted attachments, transaction linking, cost rollup.
-4. **M3 – Maintenance + notifications.** Recurring tasks, in-app notifications, at least one external channel (email or ntfy), outbound webhooks.
+4. **M3 – Maintenance + notifications.** Recurring maintenance tasks, in-app notifications, at least one external channel (email or ntfy), outbound webhooks.
 5. **M4 – Reports & polish.** Trends, net-worth over time, CSV exports, PWA.
 6. **M5 – Aggregator (optional).** Evaluate Plaid vs. Flinks for Canadian bank coverage behind a feature flag.
 
@@ -210,15 +230,11 @@ Optimising for "robust + nice UI + API-first" with multi-user auth:
 
 ## Remaining Open Questions
 
-Resolved in rev 2: user model, import strategy, banks/region, encryption-key custody, multi-currency posture. What's still needed:
+Resolved in rev 3: sharing model, stack, TOTP, budgeting style (in addition to rev 2's user model, import, banks, key custody, currency). What's still needed:
 
-1. **Household data-sharing model** — everyone in the household sees all data (recommended, matches shared-finances reality), or per-account ACLs so a member can hide a specific account from others?
-2. **Stack confirmation** — Django + DRF + SvelteKit + Postgres as proposed in §9, or one of the alternatives (NestJS+TS, or Go single-binary)? Your maintenance comfort matters more than my preference.
-3. **TOTP** — mandatory for all users from day one (recommended), or optional/opt-in?
-4. **Budgeting depth** — plain category reporting only, or envelope/zero-based budgeting (YNAB-style) on top of it?
-5. **Notifications** — besides in-app, which of {SMTP email, ntfy, Gotify, webhook} should ship in M3? (Webhook is nearly free given the API-first design.)
-6. **Attachments at rest** — encrypted by default (recommended, since receipts are PII-heavy) — confirm yes?
-7. **Bundled backup command** — include a `budgetapp backup` command that produces an encrypted dump, or leave backups entirely to the operator's `pg_dump`?
-8. **License** — AGPL-3.0 (typical for self-host-first), MIT (maximum adoption), something else, or defer?
-9. **Deployment targets besides Docker Compose** — anything else that must work on day one (Unraid, TrueNAS SCALE, Kubernetes, bare-metal systemd)?
-10. **Investment/brokerage accounts** — in scope for balance tracking only (no performance), or fully out for v1?
+1. **Notifications** — besides in-app, which of {SMTP email, ntfy, Gotify, webhook} should ship in M3? (Webhook is nearly free given the API-first design.)
+2. **Attachments at rest** — encrypted by default (recommended, since receipts are PII-heavy) — confirm yes?
+3. **Bundled backup command** — include a `budgetapp backup` command that produces an encrypted dump, or leave backups entirely to the operator's `pg_dump`?
+4. **License** — AGPL-3.0 (typical for self-host-first), MIT (maximum adoption), something else, or defer?
+5. **Deployment targets besides Docker Compose** — anything else that must work on day one (Unraid, TrueNAS SCALE, Kubernetes, bare-metal systemd)?
+6. **Investment/brokerage accounts** — in scope for balance tracking only (no performance), or fully out for v1?
