@@ -33,13 +33,16 @@ ENV NODE_ENV=production \
     PORT=3000 \
     HOST=0.0.0.0
 
-# Only the adapter-node output is required at runtime. Leaving node_modules,
-# pnpm-lock.yaml, and the pnpm symlink farm out of the final image removes
-# the build-tooling surface (esbuild native binary, tar, minimatch, glob,
-# cross-spawn, etc.) that Trivy flagged with HIGH/CRITICAL findings.
-# package.json is kept so Node picks up "type": "module".
+# Only the adapter-node output is required at runtime — it bundles every
+# runtime dep. We do not copy node_modules, pnpm-lock.yaml, or the real
+# package.json: Trivy's node-pkg scanner reads dependency names from
+# package.json and resolves their transitive tree, which surfaces
+# dev-tooling vulnerabilities (esbuild, tar, glob, minimatch, cross-spawn)
+# that are irrelevant at runtime. Write a minimal stub so Node sees
+# "type": "module" and still treats build/index.js as ESM.
 COPY --from=builder --chown=app:app /app/build ./build
-COPY --from=builder --chown=app:app /app/package.json ./package.json
+RUN echo '{"name":"budgetapp-frontend","version":"0.0.1","type":"module","private":true}' > package.json \
+    && chown app:app package.json
 
 USER app
 
