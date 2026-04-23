@@ -25,11 +25,25 @@ coverage/
 # ...but keep the tracked template that ships with the repo.
 !.env.example
 
+# --- Django runtime artifacts ------------------------------------------------
+backend/staticfiles/
+*.sqlite3
+celerybeat-schedule
+celerybeat.pid
+
+# --- Logs --------------------------------------------------------------------
+*.log
+logs/
+
 # --- OS / IDE ----------------------------------------------------------------
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
+
+# --- Claude Code -------------------------------------------------------------
+# Local AI assistant memory — personal to each developer's session.
+.claude/
 
 # --- Docker ------------------------------------------------------------------
 # Operator-specific overrides shouldn't be committed. The base compose file is.
