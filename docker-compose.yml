@@ -1,0 +1,147 @@
+# BudgetApp — Docker Compose stack.
+#
+# Canonical stack description lives in SPEC.md §5 (architecture) and §0
+# (locked-in decisions). Any change here — new service, renamed service,
+# changed port, changed dependency direction — MUST be cross-referenced
+# against SPEC.md. If the two disagree, SPEC.md wins and this file is wrong.
+#
+# Four services share one private network:
+#   db        Postgres 16, the system of record.
+#   redis     Celery broker + result backend; also available to the app for caches/rate-limits.
+#   app       Django 5 + DRF served over ASGI (uvicorn). HTTP entrypoint on :8000.
+#   worker    Celery worker — same image as `app`, different command.
+#   frontend  SvelteKit SPA on :3000. Talks to `app` over the public network, not the compose network.
+#
+# Note on VITE_API_URL: Vite bakes env vars at build time, so the frontend
+# image must be rebuilt if this URL changes. It is intentionally a browser-reachable
+# URL (e.g. http://localhost:8000/api/v1), not an internal compose hostname.
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      # pg_isready returns non-zero until Postgres is accepting connections,
+      # which is what `app` and `worker` gate on via service_healthy.
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - budgetapp
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # appendonly yes gives us durability for scheduled Celery jobs across
+    # restarts; acceptable cost for a household-scale workload.
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - budgetapp
+
+  app:
+    build:
+      context: ./backend
+    image: budgetapp-backend:local
+    restart: unless-stopped
+    env_file:
+      - .env
+    # Exposes a Django app mounted at budgetapp.asgi:application. The backend
+    # subagent owns the contents of that module; if they rename the ASGI path,
+    # update here too.
+    command: ["uvicorn", "budgetapp.asgi:application", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      # Reminder for the backend subagent: the Django app MUST expose an
+      # unauthenticated /healthz endpoint that returns 200 once migrations
+      # have been applied and the DB + Redis are reachable. Without it, this
+      # healthcheck will fail and the `frontend` soft-dependency will log
+      # noisy warnings.
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    networks:
+      - budgetapp
+    # Hardening options are intentionally left disabled so the stack runs
+    # out of the box on a fresh clone. Revisit for a hardened deployment:
+    #   read_only: true
+    #   tmpfs:
+    #     - /tmp
+    #   cap_drop: [ALL]
+    #   security_opt: ["no-new-privileges:true"]
+    #   deploy:
+    #     resources:
+    #       limits:
+    #         cpus: "2.0"
+    #         memory: 1G
+
+  worker:
+    # Reuses the backend image built by `app`. If `app` hasn't been built
+    # yet, Compose will build it via the shared build context below.
+    build:
+      context: ./backend
+    image: budgetapp-backend:local
+    restart: unless-stopped
+    env_file:
+      - .env
+    command: ["celery", "-A", "budgetapp", "worker", "--loglevel=info"]
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - budgetapp
+    # Same hardening notes as `app` apply — disabled by default.
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # VITE_* vars are baked into the client bundle at build time; exposing
+        # this as a build arg makes the dependency explicit and forces a
+        # rebuild (not just a restart) if the API URL changes.
+        VITE_API_URL: ${VITE_API_URL}
+    image: budgetapp-frontend:local
+    restart: unless-stopped
+    environment:
+      # Also passed at runtime so SSR / adapter-node code paths can read it
+      # without relying on the build-time bake.
+      VITE_API_URL: ${VITE_API_URL}
+    ports:
+      - "3000:3000"
+    # Soft dependency: the SPA can load without the API being up (it'll show
+    # a connection error), so we don't block startup on `app`.
+    depends_on:
+      - app
+    networks:
+      - budgetapp
+
+volumes:
+  pg_data:
+  redis_data:
+
+networks:
+  budgetapp:
+    driver: bridge
