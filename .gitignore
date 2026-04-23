@@ -12,6 +12,10 @@ htmlcov/
 dist/
 build/
 
+# Django SQLite dev DB (production uses Postgres).
+*.sqlite3
+*.sqlite3-journal
+
 # --- Node / SvelteKit --------------------------------------------------------
 node_modules/
 .svelte-kit/

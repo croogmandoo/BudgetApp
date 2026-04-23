@@ -121,6 +121,13 @@ exclude = [
 module = "tests.*"
 disallow_untyped_defs = false
 
+# Admin modules are idiomatic Django — ModelAdmin/TabularInline are generic
+# classes, but parameterising every subclass (ModelAdmin[Account] etc.)
+# adds noise without catching real bugs. Drop type-arg checks here.
+[[tool.mypy.overrides]]
+module = "apps.*.admin"
+disable_error_code = ["type-arg"]
+
 # Third-party modules without py.typed / stubs. Dropping import-untyped
 # for these lets mypy still validate our own code instead of bailing on
 # the first transitive import.
