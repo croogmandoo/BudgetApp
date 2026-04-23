@@ -1,0 +1,35 @@
+# Gitleaks configuration.
+#
+# We extend the default ruleset but allowlist patterns that would otherwise
+# trigger on scaffold-level, structurally-safe values:
+#
+#   1. `.env.example` is a template committed to git with placeholder values.
+#      Its DATABASE_URL has a `postgres://<user>:<password>@...` shape whose
+#      literal is `REPLACE_ME_...` but the URI pattern matches the default
+#      "password in URL" rule.
+#   2. `REPLACE_ME_<SNAKE_CASE>` tokens are documented placeholders.
+#   3. Lockfiles (`pnpm-lock.yaml`, `uv.lock`) contain integrity hashes that
+#      are high-entropy but not secrets.
+#
+# Review this file (and every allowlist entry) before adding new entries: the
+# bar for silencing a rule should be "the match is structurally incapable of
+# being a real secret", not "the match is annoying".
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Scaffold placeholders, templates, and lockfile hashes"
+paths = [
+    '''\.env\.example$''',
+    '''pnpm-lock\.yaml$''',
+    '''uv\.lock$''',
+]
+regexes = [
+    '''REPLACE_ME_[A-Z0-9_]+''',
+    # Dev-only SECRET_KEY placeholder that appeared in early scaffold commits
+    # before the settings module switched to secrets.token_urlsafe() at runtime.
+    # Gitleaks still sees it in git history even though it is no longer present
+    # in the tree.
+    '''insecure-dev-only-not-for-production''',
+]

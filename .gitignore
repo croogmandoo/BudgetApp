@@ -1,0 +1,39 @@
+# --- Python ------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+.coverage.*
+*.egg-info/
+dist/
+build/
+
+# --- Node / SvelteKit --------------------------------------------------------
+node_modules/
+.svelte-kit/
+.vite/
+coverage/
+
+# --- Environment / secrets ---------------------------------------------------
+# Ignore every .env* file by default...
+.env
+.env.*
+# ...but keep the tracked template that ships with the repo.
+!.env.example
+
+# --- OS / IDE ----------------------------------------------------------------
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# --- Docker ------------------------------------------------------------------
+# Operator-specific overrides shouldn't be committed. The base compose file is.
+docker-compose.override.yml
+
+# Lockfiles (poetry.lock, uv.lock, pnpm-lock.yaml) are intentionally NOT
+# ignored — they must be committed to make builds reproducible.
