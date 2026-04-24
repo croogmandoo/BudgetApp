@@ -85,7 +85,11 @@ class LoginView(APIView):
             return err
 
         # Not enrolled → allow partial login so the user can complete enrollment.
-        if user.totp_enforced_at is None:  # type: ignore[union-attr]
+        # Check confirmed device presence, not totp_enforced_at, so the two
+        # facts stay decoupled (admin-created users may lack a device even if
+        # totp_enforced_at were somehow set, or vice-versa).
+        has_confirmed_device = TOTPDevice.objects.filter(user=user, confirmed=True).exists()
+        if not has_confirmed_device:
             login(request, user, backend="django.contrib.auth.backends.ModelBackend")
             return Response(
                 {
