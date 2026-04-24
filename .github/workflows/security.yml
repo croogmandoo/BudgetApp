@@ -145,8 +145,13 @@ jobs:
       # pip-audit is declared as a dev dependency in backend/pyproject.toml so
       # it audits the project's resolved environment. --skip-editable avoids
       # pip-audit attempting to resolve our own package on PyPI.
+      #
+      # CVE-2026-3219: affects pip 26.0.x; no fix version published at time of
+      # filing. Ignored here because: (a) pip is a build/install tool not
+      # present at runtime, and (b) there is no patched release to upgrade to.
+      # Remove this flag once pip ships a fix.
       - name: Run pip-audit
-        run: uv run pip-audit --skip-editable
+        run: uv run pip-audit --skip-editable --ignore-vuln CVE-2026-3219
 
   pnpm-audit:
     name: pnpm audit (frontend)
