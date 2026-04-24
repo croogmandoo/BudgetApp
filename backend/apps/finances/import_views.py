@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import uuid
 from typing import cast
 
@@ -18,6 +19,8 @@ from apps.finances.importers.rules import apply_rules
 from apps.finances.models import Account, ImportBatch, ImportProfile, Transaction
 
 MAX_FILE_BYTES = 10 * 1024 * 1024
+
+_IMPORT_HASH_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
 def _household_id(request: Request) -> uuid.UUID:
@@ -47,7 +50,8 @@ class ImportPreviewView(APIView):
         except ImportProfile.DoesNotExist:
             return Response({"detail": "Import profile not found."}, status=404)
 
-        if file_obj.size > MAX_FILE_BYTES:
+        file_size = getattr(file_obj, "size", None)
+        if file_size is not None and file_size > MAX_FILE_BYTES:
             return Response({"detail": "File exceeds 10 MB limit."}, status=400)
 
         ext = file_obj.name.rsplit(".", 1)[-1].lower() if "." in file_obj.name else ""
@@ -127,9 +131,35 @@ class ImportConfirmView(APIView):
             return Response({"detail": "Import profile not found."}, status=404)
 
         user = cast(User, request.user)
-        incoming_hashes = [t["import_hash"] for t in transactions]
+        incoming_hashes = []
+        validated = []
+        for i, t in enumerate(transactions):
+            h = t.get("import_hash", "")
+            if not isinstance(h, str) or not _IMPORT_HASH_RE.match(h):
+                return Response(
+                    {"detail": f"transactions[{i}]: invalid or missing import_hash"},
+                    status=400,
+                )
+            date_val = t.get("date")
+            amount_val = t.get("amount")
+            if not date_val or not amount_val:
+                return Response(
+                    {"detail": f"transactions[{i}]: date and amount are required"},
+                    status=400,
+                )
+            try:
+                from decimal import Decimal as _D
+                _D(str(amount_val))
+            except Exception:
+                return Response(
+                    {"detail": f"transactions[{i}]: invalid amount '{amount_val}'"},
+                    status=400,
+                )
+            incoming_hashes.append(h)
+            validated.append(t)
+
         already = exact_duplicate_hashes(str(account.id), incoming_hashes)
-        to_create = [t for t in transactions if t["import_hash"] not in already]
+        to_create = [t for t in validated if t["import_hash"] not in already]
 
         with db_transaction.atomic():
             batch = ImportBatch.objects.create(
@@ -155,7 +185,10 @@ class ImportConfirmView(APIView):
             ])
 
         txn_ids = [str(t.id) for t in new_txns]
-        rules_applied = apply_rules(txn_ids, str(hh))
+        try:
+            rules_applied = apply_rules(txn_ids, str(hh))
+        except Exception:
+            rules_applied = 0
 
         return Response(
             {
