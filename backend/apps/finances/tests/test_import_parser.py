@@ -141,3 +141,89 @@ def test_import_hash_is_stable():
     r1 = parse_file(io.BytesIO(csv_data.encode()), profile, "acct-id")
     r2 = parse_file(io.BytesIO(csv_data.encode()), profile, "acct-id")
     assert r1.rows[0].import_hash == r2.rows[0].import_hash
+
+
+# ---------------------------------------------------------------------------
+# Dedup tests
+# ---------------------------------------------------------------------------
+
+from datetime import date as date_type
+
+from apps.finances.importers.dedup import exact_duplicate_hashes, fuzzy_duplicates
+from apps.finances.importers.parser import ParsedRow
+from apps.finances.models import Account, Transaction
+from apps.accounts.models import Household
+
+
+def _make_household():
+    return Household.objects.create(name="Test")
+
+
+def _make_account(household):
+    return Account.objects.create(
+        household=household, name="Chequing", type="checking", currency="CAD"
+    )
+
+
+def _make_txn(account, txn_date, amount, payee, import_hash=""):
+    return Transaction.objects.create(
+        account=account,
+        date=txn_date,
+        amount=amount,
+        payee=payee,
+        import_hash=import_hash or f"hash-{payee}",
+    )
+
+
+def _parsed_row(txn_date, amount, payee, import_hash="x"):
+    return ParsedRow(
+        row_num=1,
+        date=txn_date,
+        amount=Decimal(str(amount)),
+        payee=payee,
+        memo="",
+        original_currency="",
+        fx_rate=None,
+        import_hash=import_hash,
+    )
+
+
+@pytest.mark.django_db
+def test_exact_duplicate_detected():
+    hh = _make_household()
+    acct = _make_account(hh)
+    _make_txn(acct, date_type(2026, 4, 10), Decimal("-50"), "PAYEE", "known-hash")
+    result = exact_duplicate_hashes(str(acct.id), ["known-hash", "new-hash"])
+    assert result == {"known-hash"}
+
+
+@pytest.mark.django_db
+def test_fuzzy_date_and_amount_match():
+    hh = _make_household()
+    acct = _make_account(hh)
+    _make_txn(acct, date_type(2026, 4, 10), Decimal("-50"), "STARBUCKS", "old-hash")
+    row = _parsed_row(date_type(2026, 4, 10), "-50", "STARBUCKS KANATA", "new-hash")
+    matches = fuzzy_duplicates(str(acct.id), [row])
+    assert len(matches) == 1
+    assert "date" in matches[0].match_reason
+    assert "amount" in matches[0].match_reason
+
+
+@pytest.mark.django_db
+def test_fuzzy_no_false_positive_one_field():
+    hh = _make_household()
+    acct = _make_account(hh)
+    _make_txn(acct, date_type(2026, 4, 10), Decimal("-50"), "STARBUCKS", "old-hash")
+    row = _parsed_row(date_type(2026, 4, 10), "-99.99", "TOTALLY DIFFERENT", "new-hash")
+    matches = fuzzy_duplicates(str(acct.id), [row])
+    assert len(matches) == 0
+
+
+@pytest.mark.django_db
+def test_fuzzy_date_plus_one_day_still_matches():
+    hh = _make_household()
+    acct = _make_account(hh)
+    _make_txn(acct, date_type(2026, 4, 10), Decimal("-50"), "PAYEE", "old-hash")
+    row = _parsed_row(date_type(2026, 4, 11), "-50", "PAYEE", "new-hash")
+    matches = fuzzy_duplicates(str(acct.id), [row])
+    assert len(matches) == 1
