@@ -147,6 +147,7 @@ def test_import_hash_is_stable():
 # Dedup tests
 # ---------------------------------------------------------------------------
 
+import uuid
 from datetime import date as date_type
 
 from apps.finances.importers.dedup import exact_duplicate_hashes, fuzzy_duplicates
@@ -227,3 +228,57 @@ def test_fuzzy_date_plus_one_day_still_matches():
     row = _parsed_row(date_type(2026, 4, 11), "-50", "PAYEE", "new-hash")
     matches = fuzzy_duplicates(str(acct.id), [row])
     assert len(matches) == 1
+
+
+# ---------------------------------------------------------------------------
+# Rules application tests
+# ---------------------------------------------------------------------------
+
+from apps.finances.importers.rules import apply_rules
+from apps.finances.models import Category, Rule
+
+
+@pytest.mark.django_db
+def test_apply_rules_categorises_by_payee():
+    hh = _make_household()
+    acct = _make_account(hh)
+    cat = Category.objects.create(household=hh, name="Food", kind="expense")
+    Rule.objects.create(
+        household=hh,
+        priority=10,
+        match_json={"payee_contains": "STARBUCKS"},
+        action_json={"set_category": str(cat.id)},
+    )
+    txn = _make_txn(acct, date_type(2026, 4, 10), Decimal("-6"), "STARBUCKS KANATA")
+    count = apply_rules([str(txn.id)], str(hh.id))
+    assert count == 1
+    txn.refresh_from_db()
+    assert txn.category_id == cat.id
+
+
+@pytest.mark.django_db
+def test_apply_rules_first_match_wins():
+    hh = _make_household()
+    acct = _make_account(hh)
+    cat1 = Category.objects.create(household=hh, name="Food", kind="expense")
+    cat2 = Category.objects.create(household=hh, name="Coffee", kind="expense")
+    Rule.objects.create(household=hh, priority=10,
+        match_json={"payee_contains": "STARBUCKS"}, action_json={"set_category": str(cat1.id)})
+    Rule.objects.create(household=hh, priority=20,
+        match_json={"payee_contains": "STARBUCKS"}, action_json={"set_category": str(cat2.id)})
+    txn = _make_txn(acct, date_type(2026, 4, 10), Decimal("-6"), "STARBUCKS KANATA")
+    apply_rules([str(txn.id)], str(hh.id))
+    txn.refresh_from_db()
+    assert txn.category_id == cat1.id
+
+
+@pytest.mark.django_db
+def test_apply_rules_no_match_leaves_uncategorised():
+    hh = _make_household()
+    acct = _make_account(hh)
+    Rule.objects.create(household=hh, priority=10,
+        match_json={"payee_contains": "STARBUCKS"}, action_json={"set_category": str(uuid.uuid4())})
+    txn = _make_txn(acct, date_type(2026, 4, 10), Decimal("-6"), "MCDONALDS")
+    apply_rules([str(txn.id)], str(hh.id))
+    txn.refresh_from_db()
+    assert txn.category_id is None
