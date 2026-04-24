@@ -154,6 +154,49 @@ export interface MaintenanceTask {
   checklist: string[];
 }
 
+export interface ImportProfile {
+  id: UUID;
+  institution: string;
+  format: 'csv' | 'ofx' | 'qfx' | 'xls';
+}
+
+export interface ImportRow {
+  row: number;
+  date: ISODate;
+  amount: DecimalString;
+  payee: string;
+  memo: string;
+  original_currency: string;
+  fx_rate: DecimalString | null;
+  import_hash: string;
+}
+
+export interface ProbableImportRow extends ImportRow {
+  matched_transaction_id: UUID;
+  match_reason: string;
+}
+
+export interface ParseError {
+  row: number;
+  reason: string;
+}
+
+export interface ImportPreviewResult {
+  profile_name: string;
+  total_rows: number;
+  to_import: ImportRow[];
+  exact_duplicates: ImportRow[];
+  probable_duplicates: ProbableImportRow[];
+  parse_errors: ParseError[];
+}
+
+export interface ImportConfirmResult {
+  batch_id: UUID;
+  imported: number;
+  rules_applied: number;
+  skipped_duplicates: number;
+}
+
 export interface Session {
   user: User;
   household: Household | null; // null until household is assigned (first-run setup)

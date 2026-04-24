@@ -15,10 +15,11 @@ from rest_framework.request import Request
 
 from apps.accounts.models import User
 from apps.core.permissions import IsTOTPVerifiedHouseholdMember
-from apps.finances.models import Account, Category, Rule, Transaction
+from apps.finances.models import Account, Category, ImportProfile, Rule, Transaction
 from apps.finances.serializers import (
     AccountSerializer,
     CategorySerializer,
+    ImportProfileSerializer,
     RuleSerializer,
     TransactionSerializer,
 )
@@ -69,6 +70,16 @@ class TransactionViewSet(viewsets.ModelViewSet):  # type: ignore[type-arg]
             .select_related("account", "category")
             .prefetch_related("splits")
             .order_by("-date", "-created_at")
+        )
+
+
+class ImportProfileViewSet(viewsets.ReadOnlyModelViewSet):  # type: ignore[type-arg]
+    serializer_class = ImportProfileSerializer
+    permission_classes = [IsTOTPVerifiedHouseholdMember]
+
+    def get_queryset(self):  # type: ignore[override]
+        return ImportProfile.objects.filter(household_id=_household_id(self.request)).order_by(
+            "institution"
         )
 
 
