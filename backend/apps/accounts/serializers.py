@@ -53,10 +53,10 @@ class LoginSerializer(serializers.Serializer):
 
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True, style={"input_type": "password"})
-    totp_token = serializers.CharField(
+    totp_token = serializers.RegexField(
+        r"^\d{1,8}$",
         required=False,
         default="",
         allow_blank=True,
         write_only=True,
-        max_length=16,
     )

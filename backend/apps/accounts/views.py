@@ -11,9 +11,11 @@ import binascii
 
 import django_otp
 from django.contrib.auth import login, logout
+from django.contrib.auth.hashers import check_password, make_password
 from django.utils import timezone
 from django_otp.plugins.otp_totp.models import TOTPDevice
 from rest_framework import status
+from rest_framework.authentication import SessionAuthentication
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -25,6 +27,17 @@ from apps.accounts.serializers import (
     LoginSerializer,
     UserSerializer,
 )
+
+
+class _CsrfEnforcedAnonAuth(SessionAuthentication):
+    """Run CSRF check without rejecting unauthenticated requests."""
+
+    def authenticate(self, request: Request) -> None:
+        self.enforce_csrf(request)
+
+
+# Computed once at module load; used only to equalise timing on unknown email.
+_DUMMY_HASH: str = make_password("dummy-constant-value")
 
 
 def _user_data(user: User, request: Request) -> dict:
@@ -50,6 +63,7 @@ def _authenticate_user(email: str, password: str) -> tuple[User | None, Response
     try:
         user = User.objects.get(email=email)
     except User.DoesNotExist:
+        check_password(password, _DUMMY_HASH)  # equalise Argon2 timing
         return None, _bad
     if not user.check_password(password):
         return None, _bad
@@ -68,7 +82,7 @@ class LoginView(APIView):
     - Enrolled + missing/invalid token → 401.
     """
 
-    authentication_classes = []  # No auth required to reach login
+    authentication_classes = [_CsrfEnforcedAnonAuth]
     permission_classes = [AllowAny]
 
     def post(self, request: Request) -> Response:
@@ -209,9 +223,8 @@ class TOTPConfirmView(APIView):
         user: User = request.user  # type: ignore[assignment]
         totp_token = request.data.get("totp_token", "")
 
-        try:
-            device = TOTPDevice.objects.get(user=user, confirmed=False)
-        except TOTPDevice.DoesNotExist:
+        device = TOTPDevice.objects.filter(user=user, confirmed=False).order_by("-id").first()
+        if device is None:
             return Response(
                 {"detail": "No pending TOTP enrollment found. Call /totp/enroll/ first."},
                 status=status.HTTP_400_BAD_REQUEST,
