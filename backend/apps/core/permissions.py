@@ -26,6 +26,4 @@ class IsTOTPVerifiedHouseholdMember(IsAuthenticated):
         if not super().has_permission(request, view):
             return False
         user = request.user
-        return bool(
-            getattr(user, "household_id", None) and getattr(user, "totp_enforced_at", None)
-        )
+        return bool(getattr(user, "household_id", None) and getattr(user, "totp_enforced_at", None))
