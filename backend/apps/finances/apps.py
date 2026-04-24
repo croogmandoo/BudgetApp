@@ -14,3 +14,6 @@ class FinancesConfig(AppConfig):
     name = "apps.finances"
     label = "finances"
     verbose_name = "Accounts, transactions & imports"
+
+    def ready(self):
+        import apps.finances.signals  # noqa: F401

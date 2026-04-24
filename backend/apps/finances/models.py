@@ -90,6 +90,7 @@ class ImportFormat(models.TextChoices):
     CSV = "csv", "CSV"
     OFX = "ofx", "OFX"
     QFX = "qfx", "QFX"
+    XLS = "xls", "XLS"
 
 
 class ImportProfile(TimestampedModel):
@@ -162,9 +163,17 @@ class Transaction(TimestampedModel):
     receipt_attachment_id = models.UUIDField(null=True, blank=True)
 
     class Meta:
+        ordering = ["-date", "-created_at"]
         indexes = [
             models.Index(fields=["account", "date"]),
             models.Index(fields=["category", "date"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["account", "import_hash"],
+                condition=models.Q(import_hash__gt=""),
+                name="unique_account_import_hash",
+            )
         ]
 
 

@@ -1,0 +1,96 @@
+"""Default import profile definitions shipped with the app."""
+
+from __future__ import annotations
+
+DEFAULT_PROFILES = [
+    {
+        "institution": "RBC Chequing",
+        "format": "csv",
+        "mapping_json": {
+            "file_format": "csv",
+            "encoding": "utf-8",
+            "skip_rows": 0,
+            "date_column": "Transaction Date",
+            "date_format": "%m/%d/%Y",
+            "payee_column": "Description 1",
+            "memo_column": "Description 2",
+            "cad_column": "CAD$",
+            "usd_column": "USD$",
+            "amount_strip": [],
+            "sign_convention": "positive_is_credit",
+            "verified": True,
+        },
+    },
+    {
+        "institution": "American Express Canada",
+        "format": "xls",
+        "mapping_json": {
+            "file_format": "xls",
+            "skip_rows": 16,
+            "date_column": "Date",
+            "date_format": "%d %b. %Y",
+            "payee_column": "Description",
+            "memo_column": "Additional Information",
+            "amount_column": "Amount",
+            "amount_strip": ["$", ","],
+            "sign_convention": "positive_is_debit",
+            "fx_rate_column": "Exchange Rate",
+            "foreign_amount_column": "Foreign Spend Amount",
+            "verified": True,
+        },
+    },
+    # NOTE: CIBC CSVs use separate "Debit"/"Credit" columns. The parser currently
+    # only maps a single amount_column. Credit rows will fail to parse until a
+    # dual-column path (separate from the CAD$/USD$ path) is added. verified=False.
+    {
+        "institution": "CIBC Chequing",
+        "format": "csv",
+        "mapping_json": {
+            "file_format": "csv",
+            "encoding": "utf-8",
+            "skip_rows": 0,
+            "date_column": "Date",
+            "date_format": "%Y-%m-%d",
+            "payee_column": "Description",
+            "memo_column": "",
+            "amount_column": "Debit",
+            "amount_strip": [],
+            "sign_convention": "positive_is_credit",
+            "verified": False,
+        },
+    },
+    {
+        "institution": "TD EasyWeb",
+        "format": "csv",
+        "mapping_json": {
+            "file_format": "csv",
+            "encoding": "utf-8",
+            "skip_rows": 0,
+            "date_column": "Date",
+            "date_format": "%m/%d/%Y",
+            "payee_column": "Description",
+            "memo_column": "",
+            "amount_column": "Amount",
+            "amount_strip": [],
+            "sign_convention": "positive_is_credit",
+            "verified": False,
+        },
+    },
+    {
+        "institution": "Scotiabank",
+        "format": "csv",
+        "mapping_json": {
+            "file_format": "csv",
+            "encoding": "utf-8",
+            "skip_rows": 0,
+            "date_column": "Date",
+            "date_format": "%m/%d/%Y",
+            "payee_column": "Description",
+            "memo_column": "",
+            "amount_column": "Amount",
+            "amount_strip": [],
+            "sign_convention": "positive_is_credit",
+            "verified": False,
+        },
+    },
+]
