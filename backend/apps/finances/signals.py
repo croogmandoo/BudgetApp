@@ -11,7 +11,7 @@ from apps.finances.importers.profiles import DEFAULT_PROFILES
 def seed_import_profiles(sender, instance, created, **kwargs):
     if not created:
         return
-    from apps.finances.models import ImportProfile  # noqa: PLC0415
+    from apps.finances.models import ImportProfile
     ImportProfile.objects.bulk_create([
         ImportProfile(
             household=instance,

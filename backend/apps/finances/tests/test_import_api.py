@@ -1,12 +1,14 @@
 from __future__ import annotations
+
 import io
+from decimal import Decimal
+
 import pytest
 from django.utils import timezone
 from django_otp.plugins.otp_totp.models import TOTPDevice
+
 from apps.accounts.models import Household, User
 from apps.finances.models import Account, ImportProfile, Transaction
-from decimal import Decimal
-
 
 RBC_MAPPING = {
     "file_format": "csv",
@@ -92,8 +94,9 @@ def test_preview_returns_rows(auth_client, account, profile):
 
 @pytest.mark.django_db
 def test_preview_flags_exact_duplicate(auth_client, account, profile):
-    from apps.finances.importers.parser import _compute_hash
     from datetime import date
+
+    from apps.finances.importers.parser import _compute_hash
     known_hash = _compute_hash(str(account.id), date(2026, 4, 10), Decimal("-2503.42"), "PAYROLL")
     Transaction.objects.create(
         account=account, date=date(2026, 4, 10), amount=Decimal("-2503.42"),

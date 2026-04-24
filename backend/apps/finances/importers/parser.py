@@ -6,11 +6,11 @@ import io
 import re
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from apps.finances.models import ImportProfile
+    pass
 
 
 @dataclass
@@ -142,7 +142,7 @@ def _parse_csv(file_obj, m: dict, account_id: str) -> ParseResult:
 
 
 def _parse_xls(file_obj, m: dict, account_id: str) -> ParseResult:
-    import xlrd  # noqa: PLC0415
+    import xlrd
 
     skip_rows = m.get("skip_rows", 0)
     content = file_obj.read() if hasattr(file_obj, "read") else file_obj
