@@ -5,7 +5,6 @@
     ImportConfirmResult,
     ImportPreviewResult,
     ImportProfile,
-    ImportRow,
   } from '$lib/types';
 
   type Step = 'setup' | 'preview' | 'done';
