@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import uuid
-
 from django.db import migrations
 
 from apps.finances.importers.profiles import DEFAULT_PROFILES
@@ -13,7 +11,6 @@ def seed_profiles(apps, schema_editor):
     for household in Household.objects.all():
         for p in DEFAULT_PROFILES:
             ImportProfile.objects.create(
-                id=uuid.uuid4(),
                 household=household,
                 institution=p["institution"],
                 format=p["format"],
@@ -22,6 +19,8 @@ def seed_profiles(apps, schema_editor):
 
 
 def unseed_profiles(apps, schema_editor):
+    # WARNING: deletes ALL profiles matching these institution names, including
+    # any user-created profiles with the same name. Safe for initial seeding rollback.
     ImportProfile = apps.get_model("finances", "ImportProfile")
     institutions = [p["institution"] for p in DEFAULT_PROFILES]
     ImportProfile.objects.filter(institution__in=institutions).delete()

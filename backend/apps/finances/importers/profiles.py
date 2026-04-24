@@ -39,6 +39,9 @@ DEFAULT_PROFILES = [
             "verified": True,
         },
     },
+    # NOTE: CIBC CSVs use separate "Debit"/"Credit" columns. The parser currently
+    # only maps a single amount_column. Credit rows will fail to parse until a
+    # dual-column path (separate from the CAD$/USD$ path) is added. verified=False.
     {
         "institution": "CIBC Chequing",
         "format": "csv",

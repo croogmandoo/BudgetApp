@@ -90,6 +90,7 @@ class ImportFormat(models.TextChoices):
     CSV = "csv", "CSV"
     OFX = "ofx", "OFX"
     QFX = "qfx", "QFX"
+    XLS = "xls", "XLS"
 
 
 class ImportProfile(TimestampedModel):
