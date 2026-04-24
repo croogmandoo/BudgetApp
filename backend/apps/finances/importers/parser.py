@@ -99,6 +99,7 @@ def _row_to_parsed(
         raw = _strip_amount(row[amount_col], amount_strip)
         amount = Decimal(raw)
 
+    raw_amount = amount
     if sign_convention == "positive_is_debit":
         amount = -amount
 
@@ -115,7 +116,7 @@ def _row_to_parsed(
         memo=memo,
         original_currency=original_currency,
         fx_rate=fx_rate,
-        import_hash=_compute_hash(account_id, txn_date, amount, payee),
+        import_hash=_compute_hash(account_id, txn_date, raw_amount, payee),
     )
 
 

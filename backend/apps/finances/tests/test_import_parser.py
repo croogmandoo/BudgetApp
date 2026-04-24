@@ -32,7 +32,6 @@ class _FakeProfile:
         self.institution = "RBC Chequing"
 
 
-@pytest.mark.django_db
 def test_rbc_csv_parses_two_rows():
     profile = _FakeProfile(RBC_PROFILE_MAPPING)
     result = parse_file(io.BytesIO(RBC_CSV.encode()), profile, "test-account-id")
