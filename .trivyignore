@@ -1,0 +1,42 @@
+# Go stdlib CVEs detected in the node:22-alpine base image (Alpine's OS-level
+# Go package). Our frontend is pure Node.js; it does not execute Go code, so
+# these vulnerabilities are not reachable from our application.
+#
+# Remove each entry once the Alpine base image ships a Go version that includes
+# the fix (see fix versions below).
+#
+# CVE-2025-68121  CRITICAL  crypto/tls: cert validation during TLS resumption
+#                           fixed: go1.24.13, go1.25.7
+# CVE-2025-58183  HIGH      archive/tar: unbounded allocation on GNU sparse map
+#                           fixed: go1.24.8, go1.25.2
+# CVE-2025-61726  HIGH      net/url: memory exhaustion in query parameter parsing
+#                           fixed: go1.24.12, go1.25.6
+# CVE-2025-61728  HIGH      archive/zip: excessive CPU on archive index build
+#                           fixed: go1.24.12, go1.25.6
+# CVE-2025-61729  HIGH      crypto/x509: DoS via excessive resource consumption
+#                           fixed: go1.24.11, go1.25.5
+# CVE-2026-25679  HIGH      net/url: incorrect parsing of IPv6 host literals
+#                           fixed: go1.25.8, go1.26.1
+# CVE-2026-32280  HIGH      crypto/x509+tls: DoS in certificate chain building
+#                           fixed: go1.25.9, go1.26.2
+# CVE-2026-32281  HIGH      crypto/x509: DoS via inefficient cert chain validation
+#                           fixed: go1.25.9, go1.26.2
+# CVE-2026-32283  HIGH      crypto/tls: DoS via multiple key update messages
+#                           fixed: go1.25.9, go1.26.2
+
+CVE-2025-68121
+CVE-2025-58183
+CVE-2025-61726
+CVE-2025-61728
+CVE-2025-61729
+CVE-2026-25679
+CVE-2026-32280
+CVE-2026-32281
+CVE-2026-32283
+
+# picomatch: Trivy reports 4.0.3 (vulnerable) but pnpm-lock.yaml pins 4.0.4
+# (the fixed version). Trivy reads the minimum of the "^4.0.3" peer-dep range
+# from vite's package.json rather than following pnpm's symlinked store to the
+# actual installed version. The lockfile guarantees 4.0.4 is installed.
+# Remove once Trivy correctly resolves pnpm virtual-store versions.
+CVE-2026-33671
