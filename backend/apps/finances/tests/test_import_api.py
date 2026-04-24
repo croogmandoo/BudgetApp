@@ -150,3 +150,20 @@ def test_preview_wrong_account_returns_404(auth_client, profile):
         format="multipart",
     )
     assert resp.status_code == 404
+
+
+@pytest.mark.django_db
+def test_new_household_gets_default_profiles():
+    """A freshly created household should have 5 seeded import profiles."""
+    hh = Household.objects.create(name="Brand New")
+    assert ImportProfile.objects.filter(household=hh).count() == 5
+
+
+@pytest.mark.django_db
+def test_default_profiles_include_rbc_and_amex():
+    hh = Household.objects.create(name="Fresh")
+    institutions = set(
+        ImportProfile.objects.filter(household=hh).values_list("institution", flat=True)
+    )
+    assert "RBC Chequing" in institutions
+    assert "American Express Canada" in institutions
