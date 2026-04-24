@@ -14,6 +14,7 @@ from rest_framework import serializers
 from apps.finances.models import (
     Account,
     Category,
+    ImportProfile,
     Rule,
     Transaction,
     TransactionSplit,
@@ -130,6 +131,13 @@ class TransactionSerializer(serializers.ModelSerializer[Transaction]):
             for split_data in splits_data:
                 TransactionSplit.objects.create(parent_transaction=instance, **split_data)
         return instance
+
+
+class ImportProfileSerializer(serializers.ModelSerializer[ImportProfile]):
+    class Meta:
+        model = ImportProfile
+        fields = ["id", "institution", "format"]
+        read_only_fields = ["id"]
 
 
 class RuleSerializer(serializers.ModelSerializer[Rule]):

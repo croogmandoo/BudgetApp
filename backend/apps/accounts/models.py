@@ -18,6 +18,7 @@ import uuid
 
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django_otp.plugins.otp_totp.models import TOTPDevice
 
 from apps.core.models import TimestampedModel
 
@@ -84,3 +85,27 @@ class APIToken(TimestampedModel):
         indexes = [
             models.Index(fields=["user", "revoked_at"]),
         ]
+
+
+class TOTPDeviceSecret(models.Model):
+    """Envelope-encrypted TOTP secret for a TOTPDevice (SPEC §7.2).
+
+    When APP_MASTER_KEY is set, the plaintext ``device.key`` is replaced with
+    a dummy value and the real key is stored here, encrypted under a per-row
+    DEK that is itself wrapped by the master key.
+
+    Wire layout mirrors WrappedDEK: ``wrapped_dek`` = nonce||ciphertext of the
+    DEK; ``nonce`` + ``ciphertext`` are the GCM nonce and ciphertext of the
+    plaintext TOTP hex key.
+    """
+
+    device = models.OneToOneField(TOTPDevice, on_delete=models.CASCADE, related_name="secret")
+    wrapped_dek = models.BinaryField()
+    ciphertext = models.BinaryField()
+    nonce = models.BinaryField()
+
+    class Meta:
+        app_label = "accounts"
+
+    def __str__(self) -> str:
+        return f"TOTPDeviceSecret(device_id={self.device_id})"

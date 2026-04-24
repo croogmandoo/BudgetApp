@@ -11,9 +11,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     UV_LINK_MODE=copy \
     UV_COMPILE_BYTECODE=1 \
     UV_PYTHON_DOWNLOADS=never \
-    # Tell uv which venv to target so both `uv pip install` and `uv sync`
-    # use /opt/venv rather than auto-discovering (or creating) .venv.
+    # VIRTUAL_ENV: used by `uv pip install` and activates the venv on PATH.
+    # UV_PROJECT_ENVIRONMENT: required by `uv sync` (>= 0.4) to target a
+    # specific directory instead of auto-creating .venv in the project root.
     VIRTUAL_ENV=/opt/venv \
+    UV_PROJECT_ENVIRONMENT=/opt/venv \
     PATH="/opt/venv/bin:$PATH"
 
 RUN apt-get update \

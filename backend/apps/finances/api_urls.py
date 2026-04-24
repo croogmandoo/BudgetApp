@@ -9,6 +9,7 @@ from apps.finances.import_views import ImportConfirmView, ImportPreviewView
 from apps.finances.views import (
     AccountViewSet,
     CategoryViewSet,
+    ImportProfileViewSet,
     RuleViewSet,
     TransactionViewSet,
 )
@@ -18,6 +19,7 @@ router.register("accounts", AccountViewSet, basename="account")
 router.register("categories", CategoryViewSet, basename="category")
 router.register("transactions", TransactionViewSet, basename="transaction")
 router.register("rules", RuleViewSet, basename="rule")
+router.register("import-profiles", ImportProfileViewSet, basename="import-profile")
 
 urlpatterns: list[URLPattern | URLResolver] = [
     *router.urls,
