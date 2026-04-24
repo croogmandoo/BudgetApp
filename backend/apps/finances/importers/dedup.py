@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import timedelta
 
-from apps.finances.importers.parser import ParsedRow
+from apps.finances.importers.parser import ParsedRow, _normalize_payee
 from apps.finances.models import Transaction
 
 
@@ -15,6 +15,8 @@ class FuzzyMatch:
 
 
 def exact_duplicate_hashes(account_id: str, hashes: list[str]) -> set[str]:
+    if not hashes:
+        return set()
     return set(
         Transaction.objects.filter(
             account_id=account_id,
@@ -43,7 +45,7 @@ def fuzzy_duplicates(account_id: str, rows: list[ParsedRow]) -> list[FuzzyMatch]
                 matched.append("date")
             if cand["amount"] == row.amount:
                 matched.append("amount")
-            if cand["payee"].strip().lower() == row.payee.lower():
+            if cand["payee"] and _normalize_payee(cand["payee"]).lower() == row.payee.lower():
                 matched.append("payee")
             if len(matched) >= 2:
                 results.append(
