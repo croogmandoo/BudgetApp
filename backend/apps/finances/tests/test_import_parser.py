@@ -78,7 +78,6 @@ def _make_amex_xls(rows: list[list]) -> io.BytesIO:
     return buf
 
 
-@pytest.mark.django_db
 def test_amex_xls_charge_is_negative():
     """A positive Amex charge (positive_is_debit) should be stored as negative."""
     profile = _FakeProfile(AMEX_PROFILE_MAPPING)
@@ -91,7 +90,6 @@ def test_amex_xls_charge_is_negative():
     assert result.rows[0].amount == Decimal("-27.72")
 
 
-@pytest.mark.django_db
 def test_amex_xls_credit_is_positive():
     """A negative Amex entry (credit/refund) should be stored as positive."""
     profile = _FakeProfile(AMEX_PROFILE_MAPPING)
@@ -100,10 +98,11 @@ def test_amex_xls_credit_is_positive():
          "", "", "", "", "", "OLDNAVY REFUND"],
     ])
     result = parse_file(xls, profile, "acct-id")
+    assert len(result.rows) == 1
+    assert len(result.parse_errors) == 0
     assert result.rows[0].amount == Decimal("61.00")
 
 
-@pytest.mark.django_db
 def test_bad_row_is_skipped_and_reported():
     """A row with an invalid date is skipped; parse_errors contains it."""
     profile = _FakeProfile(RBC_PROFILE_MAPPING)
@@ -119,7 +118,6 @@ def test_bad_row_is_skipped_and_reported():
     assert result.parse_errors[0].row_num == 2
 
 
-@pytest.mark.django_db
 def test_rbc_usd_column_sets_original_currency():
     """A non-empty USD$ column means original_currency='USD'."""
     profile = _FakeProfile(RBC_PROFILE_MAPPING)
