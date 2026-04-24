@@ -26,7 +26,7 @@
         // Partial session — go enroll TOTP
         await goto('/totp-setup');
       } else {
-        setSession({ user: data.user, household: data.household!, totp_verified: true });
+        setSession({ user: data.user, household: data.household ?? null, totp_verified: true });
         await goto('/');
       }
     } catch (err) {

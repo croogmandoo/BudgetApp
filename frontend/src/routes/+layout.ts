@@ -14,7 +14,7 @@ export const load: LayoutLoad = async ({ url }) => {
 
   try {
     const data = await api.get<{ user: User; household: Household | null }>('/auth/me/');
-    setSession({ user: data.user, household: data.household!, totp_verified: true });
+    setSession({ user: data.user, household: data.household, totp_verified: true });
   } catch (err) {
     clearSession();
     if (!isPublic) {

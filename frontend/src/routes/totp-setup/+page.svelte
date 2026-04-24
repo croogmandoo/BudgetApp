@@ -3,6 +3,7 @@
   import { goto } from '$app/navigation';
   import { api, ApiError } from '$lib/api';
   import { setSession } from '$lib/stores/session';
+  import type { User, Household } from '$lib/types';
 
   let secret = $state<string | null>(null);
   let code = $state('');
@@ -26,7 +27,7 @@
     try {
       await api.post('/auth/totp/confirm/', { totp_token: code });
       // Session is now fully verified; fetch /me to hydrate
-      const me = await api.get<{ user: any; household: any }>('/auth/me/');
+      const me = await api.get<{ user: User; household: Household | null }>('/auth/me/');
       setSession({ user: me.user, household: me.household, totp_verified: true });
       await goto('/');
     } catch (err) {
