@@ -145,8 +145,12 @@ jobs:
       # pip-audit is declared as a dev dependency in backend/pyproject.toml so
       # it audits the project's resolved environment. --skip-editable avoids
       # pip-audit attempting to resolve our own package on PyPI.
+      # CVE-2026-3219 affects pip itself (not our code). No fixed version is
+      # available yet; ignore until the pip release ships.
       - name: Run pip-audit
-        run: uv run pip-audit --skip-editable
+        run: |
+          uv run pip-audit --skip-editable \
+            --ignore-vuln CVE-2026-3219
 
   pnpm-audit:
     name: pnpm audit (frontend)
@@ -244,10 +248,12 @@ jobs:
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v "$HOME/.cache/trivy:/root/.cache/" \
+            -v "$GITHUB_WORKSPACE/.trivyignore:/.trivyignore" \
             "$TRIVY_IMAGE" \
             image \
               --severity CRITICAL,HIGH \
               --exit-code 1 \
               --ignore-unfixed \
+              --ignorefile /.trivyignore \
               --pkg-types os,library \
               budgetapp-frontend:ci
