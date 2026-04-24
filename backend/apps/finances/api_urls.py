@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from django.urls import URLPattern, URLResolver
+from django.urls import URLPattern, URLResolver, path
 from rest_framework.routers import DefaultRouter
 
+from apps.finances.import_views import ImportConfirmView, ImportPreviewView
 from apps.finances.views import (
     AccountViewSet,
     CategoryViewSet,
@@ -18,4 +19,8 @@ router.register("categories", CategoryViewSet, basename="category")
 router.register("transactions", TransactionViewSet, basename="transaction")
 router.register("rules", RuleViewSet, basename="rule")
 
-urlpatterns: list[URLPattern | URLResolver] = router.urls
+urlpatterns: list[URLPattern | URLResolver] = [
+    *router.urls,
+    path("imports/preview/", ImportPreviewView.as_view(), name="import-preview"),
+    path("imports/confirm/", ImportConfirmView.as_view(), name="import-confirm"),
+]
