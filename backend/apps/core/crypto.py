@@ -20,6 +20,7 @@ narrow.
 
 from __future__ import annotations
 
+import base64
 import os
 from dataclasses import dataclass
 
@@ -144,3 +145,33 @@ class Cipher:
         dek = self.unwrap_dek(wrapped)
         new_cipher = Cipher(new_master_key)
         return new_cipher.wrap_dek(dek)
+
+
+_KEY_SIZE = 32  # 256-bit master key
+
+
+def get_cipher() -> Cipher | None:
+    """Return a Cipher bound to APP_MASTER_KEY, or None when the key is unset (dev/test).
+
+    APP_MASTER_KEY must be a 64-character hex string (32 raw bytes) or a
+    base64-encoded 32-byte value. In DEBUG mode an empty key is allowed and
+    this returns None so callers can skip encryption gracefully.
+    """
+    from django.conf import settings
+
+    raw: str = getattr(settings, "APP_MASTER_KEY", "")
+    if not raw:
+        return None
+    # Prefer hex (64 chars); fall back to standard base64.
+    try:
+        key = bytes.fromhex(raw)
+    except ValueError:
+        try:
+            key = base64.b64decode(raw)
+        except Exception as err:
+            raise ValueError(
+                "APP_MASTER_KEY must be a 64-char hex string or base64-encoded 32 bytes."
+            ) from err
+    if len(key) != _KEY_SIZE:
+        raise ValueError(f"APP_MASTER_KEY decoded to {len(key)} bytes; expected {_KEY_SIZE}.")
+    return Cipher(key)
