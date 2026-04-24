@@ -16,7 +16,7 @@ from rest_framework.views import APIView
 from apps.accounts.models import User
 from apps.core.permissions import IsTOTPVerifiedHouseholdMember
 from apps.finances.importers.dedup import exact_duplicate_hashes, fuzzy_duplicates
-from apps.finances.importers.parser import _compute_hash, _normalize_payee, parse_file
+from apps.finances.importers.parser import _compute_hash, parse_file
 from apps.finances.importers.rules import apply_rules
 from apps.finances.models import Account, ImportBatch, ImportProfile, Transaction
 
@@ -109,7 +109,7 @@ class ImportPreviewView(APIView):
 class ImportConfirmView(APIView):
     permission_classes = [IsTOTPVerifiedHouseholdMember]
 
-    def post(self, request: Request) -> Response:
+    def post(self, request: Request) -> Response:  # noqa: PLR0911
         data = request.data
         account_id = data.get("account_id")
         profile_id = data.get("profile_id")

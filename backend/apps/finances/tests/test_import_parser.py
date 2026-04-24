@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import io
 import uuid
 from datetime import date as date_type
@@ -7,8 +8,11 @@ from decimal import Decimal
 import pytest
 import xlwt
 
-from apps.finances.importers.parser import parse_file
-
+from apps.accounts.models import Household
+from apps.finances.importers.dedup import exact_duplicate_hashes, fuzzy_duplicates
+from apps.finances.importers.parser import ParsedRow, parse_file
+from apps.finances.importers.rules import apply_rules
+from apps.finances.models import Account, Category, Rule, Transaction
 
 RBC_PROFILE_MAPPING = {
     "file_format": "csv",
@@ -149,12 +153,6 @@ def test_import_hash_is_stable():
 # Dedup tests
 # ---------------------------------------------------------------------------
 
-from apps.finances.importers.dedup import exact_duplicate_hashes, fuzzy_duplicates
-from apps.finances.importers.parser import ParsedRow
-from apps.finances.models import Account, Transaction
-from apps.accounts.models import Household
-
-
 def _make_household():
     return Household.objects.create(name="Test")
 
@@ -232,10 +230,6 @@ def test_fuzzy_date_plus_one_day_still_matches():
 # ---------------------------------------------------------------------------
 # Rules application tests
 # ---------------------------------------------------------------------------
-
-from apps.finances.importers.rules import apply_rules
-from apps.finances.models import Category, Rule
-
 
 @pytest.mark.django_db
 def test_apply_rules_categorises_by_payee():

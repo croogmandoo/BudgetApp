@@ -47,7 +47,7 @@ def fuzzy_duplicates(account_id: str, rows: list[ParsedRow]) -> list[FuzzyMatch]
                 matched.append("amount")
             if cand["payee"] and _normalize_payee(cand["payee"]).lower() == row.payee.lower():
                 matched.append("payee")
-            if len(matched) >= 2:
+            if len(matched) >= 2:  # noqa: PLR2004
                 results.append(
                     FuzzyMatch(
                         parsed_row=row,
