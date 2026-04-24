@@ -6,9 +6,7 @@ from apps.finances.models import Rule, Transaction
 
 
 def apply_rules(transaction_ids: list[str], household_id: str) -> int:
-    rules = list(
-        Rule.objects.filter(household_id=household_id, enabled=True).order_by("priority")
-    )
+    rules = list(Rule.objects.filter(household_id=household_id, enabled=True).order_by("priority"))
     if not rules:
         return 0
 

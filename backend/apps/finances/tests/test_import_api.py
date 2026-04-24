@@ -62,7 +62,9 @@ def account(household):
 @pytest.fixture
 def profile(household):
     return ImportProfile.objects.create(
-        household=household, institution="RBC Chequing", format="csv",
+        household=household,
+        institution="RBC Chequing",
+        format="csv",
         mapping_json=RBC_MAPPING,
     )
 
@@ -70,6 +72,7 @@ def profile(household):
 @pytest.fixture
 def auth_client(user):
     from rest_framework.test import APIClient
+
     client = APIClient()
     client.force_authenticate(user=user)
     return client
@@ -97,10 +100,14 @@ def test_preview_flags_exact_duplicate(auth_client, account, profile):
     from datetime import date
 
     from apps.finances.importers.parser import _compute_hash
+
     known_hash = _compute_hash(str(account.id), date(2026, 4, 10), Decimal("-2503.42"), "PAYROLL")
     Transaction.objects.create(
-        account=account, date=date(2026, 4, 10), amount=Decimal("-2503.42"),
-        payee="PAYROLL", import_hash=known_hash,
+        account=account,
+        date=date(2026, 4, 10),
+        amount=Decimal("-2503.42"),
+        payee="PAYROLL",
+        import_hash=known_hash,
     )
     f = io.BytesIO(RBC_CSV.encode())
     f.name = "rbc.csv"
@@ -145,6 +152,7 @@ def test_confirm_creates_transactions(auth_client, account, profile):
 @pytest.mark.django_db
 def test_preview_wrong_account_returns_404(auth_client, profile):
     import uuid
+
     f = io.BytesIO(RBC_CSV.encode())
     f.name = "rbc.csv"
     resp = auth_client.post(

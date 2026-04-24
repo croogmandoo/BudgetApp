@@ -70,9 +70,19 @@ def _make_amex_xls(rows: list[list]) -> io.BytesIO:
     ws = wb.add_sheet("Sheet1")
     for r in range(16):
         ws.write(r, 0, "")
-    headers = ["Date", "Date Processed", "Description", "Cardmember",
-               "Amount", "Foreign Spend Amount", "Commission",
-               "Exchange Rate", "Merchant", "Merchant Address", "Additional Information"]
+    headers = [
+        "Date",
+        "Date Processed",
+        "Description",
+        "Cardmember",
+        "Amount",
+        "Foreign Spend Amount",
+        "Commission",
+        "Exchange Rate",
+        "Merchant",
+        "Merchant Address",
+        "Additional Information",
+    ]
     for c, h in enumerate(headers):
         ws.write(16, c, h)
     for r_idx, row in enumerate(rows, start=17):
@@ -87,10 +97,23 @@ def _make_amex_xls(rows: list[list]) -> io.BytesIO:
 def test_amex_xls_charge_is_negative():
     """A positive Amex charge (positive_is_debit) should be stored as negative."""
     profile = _FakeProfile(AMEX_PROFILE_MAPPING)
-    xls = _make_amex_xls([
-        ["23 Apr. 2026", "23 Apr. 2026", "UBER EATS TORONTO", "CRAIG", "$27.72",
-         "", "", "", "", "", "UBER EATS TORONTO"],
-    ])
+    xls = _make_amex_xls(
+        [
+            [
+                "23 Apr. 2026",
+                "23 Apr. 2026",
+                "UBER EATS TORONTO",
+                "CRAIG",
+                "$27.72",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "UBER EATS TORONTO",
+            ],
+        ]
+    )
     result = parse_file(xls, profile, "acct-id")
     assert len(result.rows) == 1
     assert result.rows[0].amount == Decimal("-27.72")
@@ -99,10 +122,23 @@ def test_amex_xls_charge_is_negative():
 def test_amex_xls_credit_is_positive():
     """A negative Amex entry (credit/refund) should be stored as positive."""
     profile = _FakeProfile(AMEX_PROFILE_MAPPING)
-    xls = _make_amex_xls([
-        ["17 Apr. 2026", "17 Apr. 2026", "OLDNAVY REFUND", "", "-$61.00",
-         "", "", "", "", "", "OLDNAVY REFUND"],
-    ])
+    xls = _make_amex_xls(
+        [
+            [
+                "17 Apr. 2026",
+                "17 Apr. 2026",
+                "OLDNAVY REFUND",
+                "",
+                "-$61.00",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "OLDNAVY REFUND",
+            ],
+        ]
+    )
     result = parse_file(xls, profile, "acct-id")
     assert len(result.rows) == 1
     assert len(result.parse_errors) == 0
@@ -152,6 +188,7 @@ def test_import_hash_is_stable():
 # ---------------------------------------------------------------------------
 # Dedup tests
 # ---------------------------------------------------------------------------
+
 
 def _make_household():
     return Household.objects.create(name="Test")
@@ -231,6 +268,7 @@ def test_fuzzy_date_plus_one_day_still_matches():
 # Rules application tests
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.django_db
 def test_apply_rules_categorises_by_payee():
     hh = _make_household()
@@ -255,10 +293,18 @@ def test_apply_rules_first_match_wins():
     acct = _make_account(hh)
     cat1 = Category.objects.create(household=hh, name="Food", kind="expense")
     cat2 = Category.objects.create(household=hh, name="Coffee", kind="expense")
-    Rule.objects.create(household=hh, priority=10,
-        match_json={"payee_contains": "STARBUCKS"}, action_json={"set_category": str(cat1.id)})
-    Rule.objects.create(household=hh, priority=20,
-        match_json={"payee_contains": "STARBUCKS"}, action_json={"set_category": str(cat2.id)})
+    Rule.objects.create(
+        household=hh,
+        priority=10,
+        match_json={"payee_contains": "STARBUCKS"},
+        action_json={"set_category": str(cat1.id)},
+    )
+    Rule.objects.create(
+        household=hh,
+        priority=20,
+        match_json={"payee_contains": "STARBUCKS"},
+        action_json={"set_category": str(cat2.id)},
+    )
     txn = _make_txn(acct, date_type(2026, 4, 10), Decimal("-6"), "STARBUCKS KANATA")
     apply_rules([str(txn.id)], str(hh.id))
     txn.refresh_from_db()
@@ -269,8 +315,12 @@ def test_apply_rules_first_match_wins():
 def test_apply_rules_no_match_leaves_uncategorised():
     hh = _make_household()
     acct = _make_account(hh)
-    Rule.objects.create(household=hh, priority=10,
-        match_json={"payee_contains": "STARBUCKS"}, action_json={"set_category": str(uuid.uuid4())})
+    Rule.objects.create(
+        household=hh,
+        priority=10,
+        match_json={"payee_contains": "STARBUCKS"},
+        action_json={"set_category": str(uuid.uuid4())},
+    )
     txn = _make_txn(acct, date_type(2026, 4, 10), Decimal("-6"), "MCDONALDS")
     apply_rules([str(txn.id)], str(hh.id))
     txn.refresh_from_db()
@@ -283,13 +333,17 @@ def test_apply_rules_memo_contains():
     acct = _make_account(hh)
     cat = Category.objects.create(household=hh, name="Bills", kind="expense")
     Rule.objects.create(
-        household=hh, priority=10,
+        household=hh,
+        priority=10,
         match_json={"memo_contains": "INTERNET"},
         action_json={"set_category": str(cat.id)},
     )
     txn = Transaction.objects.create(
-        account=acct, date=date_type(2026, 4, 10), amount=Decimal("-89.99"),
-        payee="ROGERS COMM", memo="INTERNET BILL APRIL",
+        account=acct,
+        date=date_type(2026, 4, 10),
+        amount=Decimal("-89.99"),
+        payee="ROGERS COMM",
+        memo="INTERNET BILL APRIL",
         import_hash="hash-rogers",
     )
     count = apply_rules([str(txn.id)], str(hh.id))
@@ -304,13 +358,17 @@ def test_apply_rules_amount_lt():
     acct = _make_account(hh)
     cat = Category.objects.create(household=hh, name="Small", kind="expense")
     Rule.objects.create(
-        household=hh, priority=10,
+        household=hh,
+        priority=10,
         match_json={"amount_lt": 0},
         action_json={"set_category": str(cat.id)},
     )
     txn = Transaction.objects.create(
-        account=acct, date=date_type(2026, 4, 10), amount=Decimal("-10"),
-        payee="COFFEE", import_hash="hash-coffee",
+        account=acct,
+        date=date_type(2026, 4, 10),
+        amount=Decimal("-10"),
+        payee="COFFEE",
+        import_hash="hash-coffee",
     )
     count = apply_rules([str(txn.id)], str(hh.id))
     assert count == 1

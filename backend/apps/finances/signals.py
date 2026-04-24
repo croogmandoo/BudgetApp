@@ -12,12 +12,15 @@ def seed_import_profiles(sender, instance, created, **kwargs):
     if not created:
         return
     from apps.finances.models import ImportProfile
-    ImportProfile.objects.bulk_create([
-        ImportProfile(
-            household=instance,
-            institution=p["institution"],
-            format=p["format"],
-            mapping_json=p["mapping_json"],
-        )
-        for p in DEFAULT_PROFILES
-    ])
+
+    ImportProfile.objects.bulk_create(
+        [
+            ImportProfile(
+                household=instance,
+                institution=p["institution"],
+                format=p["format"],
+                mapping_json=p["mapping_json"],
+            )
+            for p in DEFAULT_PROFILES
+        ]
+    )

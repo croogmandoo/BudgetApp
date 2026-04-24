@@ -86,24 +86,28 @@ class ImportPreviewView(APIView):
                 exact_out.append(d)
             elif row.import_hash in fuzzy_hash_map:
                 fm = fuzzy_hash_map[row.import_hash]
-                probable_out.append({
-                    **d,
-                    "matched_transaction_id": fm.matched_transaction_id,
-                    "match_reason": fm.match_reason,
-                })
+                probable_out.append(
+                    {
+                        **d,
+                        "matched_transaction_id": fm.matched_transaction_id,
+                        "match_reason": fm.match_reason,
+                    }
+                )
             else:
                 to_import.append(d)
 
-        return Response({
-            "profile_name": profile.institution,
-            "total_rows": len(result.rows),
-            "to_import": to_import,
-            "exact_duplicates": exact_out,
-            "probable_duplicates": probable_out,
-            "parse_errors": [
-                {"row": e.row_num, "reason": e.reason} for e in result.parse_errors
-            ],
-        })
+        return Response(
+            {
+                "profile_name": profile.institution,
+                "total_rows": len(result.rows),
+                "to_import": to_import,
+                "exact_duplicates": exact_out,
+                "probable_duplicates": probable_out,
+                "parse_errors": [
+                    {"row": e.row_num, "reason": e.reason} for e in result.parse_errors
+                ],
+            }
+        )
 
 
 class ImportConfirmView(APIView):
@@ -184,20 +188,22 @@ class ImportConfirmView(APIView):
                 sha256=file_sha256,
                 row_count=len(to_create),
             )
-            new_txns = Transaction.objects.bulk_create([
-                Transaction(
-                    account=account,
-                    date=t["date"],
-                    amount=t["amount"],
-                    payee=t.get("payee", ""),
-                    memo=t.get("memo", ""),
-                    original_currency=t.get("original_currency", ""),
-                    fx_rate=t.get("fx_rate") or None,
-                    import_hash=t["import_hash"],
-                    import_batch=batch,
-                )
-                for t in to_create
-            ])
+            new_txns = Transaction.objects.bulk_create(
+                [
+                    Transaction(
+                        account=account,
+                        date=t["date"],
+                        amount=t["amount"],
+                        payee=t.get("payee", ""),
+                        memo=t.get("memo", ""),
+                        original_currency=t.get("original_currency", ""),
+                        fx_rate=t.get("fx_rate") or None,
+                        import_hash=t["import_hash"],
+                        import_batch=batch,
+                    )
+                    for t in to_create
+                ]
+            )
 
         txn_ids = [str(t.id) for t in new_txns]
         try:

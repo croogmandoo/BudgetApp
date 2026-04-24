@@ -46,6 +46,7 @@ def parse_file(file_obj, profile, account_id: str) -> ParseResult:
 
 # ---------- internals ----------
 
+
 def _normalize_payee(s: str) -> str:
     return re.sub(r"\s+", " ", s).strip()
 
@@ -156,10 +157,7 @@ def _parse_xls(file_obj, m: dict, account_id: str) -> ParseResult:
 
     result = ParseResult()
     for row_idx in range(skip_rows + 1, ws.nrows):
-        row_dict = {
-            headers[c]: str(ws.cell_value(row_idx, c)).strip()
-            for c in range(ws.ncols)
-        }
+        row_dict = {headers[c]: str(ws.cell_value(row_idx, c)).strip() for c in range(ws.ncols)}
         if not any(row_dict.values()):
             continue
         try:
