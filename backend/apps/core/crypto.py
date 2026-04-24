@@ -25,6 +25,10 @@ from dataclasses import dataclass
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
+# 96-bit GCM nonce as per SPEC §7.2. Shared by WrappedDEK and Cipher so that
+# both can validate / slice nonces without a circular dependency.
+_NONCE_SIZE = 12
+
 
 @dataclass(frozen=True)
 class WrappedDEK:
@@ -32,10 +36,34 @@ class WrappedDEK:
 
     ``ciphertext`` is the DEK encrypted with the master key (AES-256-GCM).
     ``nonce`` is the 96-bit GCM nonce used for that wrap.
+
+    Wire format (used by ``to_bytes`` / ``from_bytes``)::
+
+        nonce (12 bytes) || ciphertext (variable)
+
+    This format is used to store a ``WrappedDEK`` in a single ``BinaryField``
+    (e.g. ``Attachment.dek_enc``).
     """
 
     ciphertext: bytes
     nonce: bytes
+
+    def to_bytes(self) -> bytes:
+        """Serialise to the canonical wire format: ``nonce (12 B) || ciphertext``."""
+        return self.nonce + self.ciphertext
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> WrappedDEK:
+        """Deserialise from the canonical wire format.
+
+        Raises ``ValueError`` if ``data`` is shorter than 12 bytes (the
+        minimum needed to hold a nonce).
+        """
+        if len(data) < _NONCE_SIZE:
+            raise ValueError(
+                f"WrappedDEK blob too short: need >= {_NONCE_SIZE} bytes, got {len(data)}"
+            )
+        return cls(nonce=data[:_NONCE_SIZE], ciphertext=data[_NONCE_SIZE:])
 
 
 class Cipher:
@@ -47,7 +75,7 @@ class Cipher:
     construction time and never stored outside memory.
     """
 
-    _NONCE_SIZE = 12  # 96-bit GCM nonce as per SPEC §7.2
+    _NONCE_SIZE = _NONCE_SIZE  # 96-bit GCM nonce as per SPEC §7.2
     _DEK_SIZE = 32  # 256-bit DEK
 
     def __init__(self, master_key: bytes) -> None:
@@ -72,9 +100,12 @@ class Cipher:
     def unwrap_dek(self, wrapped: WrappedDEK) -> bytes:
         """Decrypt a previously wrapped DEK.
 
+        Raises ``ValueError`` if ``wrapped.nonce`` is not exactly 12 bytes.
         Raises ``cryptography.exceptions.InvalidTag`` if the ciphertext or
         nonce has been tampered with (authentication tag mismatch).
         """
+        if len(wrapped.nonce) != self._NONCE_SIZE:
+            raise ValueError(f"nonce must be 12 bytes, got {len(wrapped.nonce)}")
         return self._master_aesgcm.decrypt(wrapped.nonce, wrapped.ciphertext, None)
 
     def encrypt(self, plaintext: bytes, dek: bytes) -> tuple[bytes, bytes]:
@@ -91,9 +122,12 @@ class Cipher:
     def decrypt(self, ciphertext: bytes, nonce: bytes, dek: bytes) -> bytes:
         """Authenticated-decrypt ``ciphertext`` under ``dek`` + ``nonce``.
 
+        Raises ``ValueError`` if ``nonce`` is not exactly 12 bytes.
         Raises ``cryptography.exceptions.InvalidTag`` on authentication
         failure (tampered ciphertext, wrong key, or wrong nonce).
         """
+        if len(nonce) != self._NONCE_SIZE:
+            raise ValueError(f"nonce must be 12 bytes, got {len(nonce)}")
         aesgcm = AESGCM(dek)
         return aesgcm.decrypt(nonce, ciphertext, None)
 

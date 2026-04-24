@@ -257,3 +257,84 @@ def test_rotate_master_key_wrong_current_key_raises() -> None:
     new_master_key = os.urandom(32)
     with pytest.raises(InvalidTag):
         wrong_cipher.rotate_master_key(new_master_key, wrapped)
+
+
+# ---------------------------------------------------------------------------
+# WrappedDEK serialization (to_bytes / from_bytes)
+# ---------------------------------------------------------------------------
+
+
+def test_wrapped_dek_round_trip_serialization(cipher: Cipher) -> None:
+    """to_bytes() then from_bytes() must reconstruct the original WrappedDEK."""
+    dek = cipher.generate_dek()
+    wrapped = cipher.wrap_dek(dek)
+
+    blob = wrapped.to_bytes()
+    restored = WrappedDEK.from_bytes(blob)
+
+    assert restored.nonce == wrapped.nonce
+    assert restored.ciphertext == wrapped.ciphertext
+
+
+def test_wrapped_dek_to_bytes_wire_format(cipher: Cipher) -> None:
+    """Wire format must be nonce (12 B) concatenated with ciphertext."""
+    dek = cipher.generate_dek()
+    wrapped = cipher.wrap_dek(dek)
+
+    blob = wrapped.to_bytes()
+    assert blob[:12] == wrapped.nonce
+    assert blob[12:] == wrapped.ciphertext
+
+
+def test_wrapped_dek_from_bytes_too_short_raises() -> None:
+    """from_bytes() with fewer than 12 bytes must raise ValueError."""
+    with pytest.raises(ValueError, match="too short"):
+        WrappedDEK.from_bytes(b"short")
+
+
+def test_wrapped_dek_from_bytes_exactly_12_bytes() -> None:
+    """from_bytes() with exactly 12 bytes is valid (nonce only, empty ciphertext)."""
+    blob = b"\x00" * 12
+    restored = WrappedDEK.from_bytes(blob)
+    assert restored.nonce == b"\x00" * 12
+    assert restored.ciphertext == b""
+
+
+def test_wrapped_dek_serialized_can_unwrap(cipher: Cipher) -> None:
+    """A WrappedDEK round-tripped through to_bytes/from_bytes must still unwrap correctly."""
+    dek = cipher.generate_dek()
+    wrapped = cipher.wrap_dek(dek)
+
+    restored = WrappedDEK.from_bytes(wrapped.to_bytes())
+    assert cipher.unwrap_dek(restored) == dek
+
+
+# ---------------------------------------------------------------------------
+# Nonce-length validation — unwrap_dek and decrypt
+# ---------------------------------------------------------------------------
+
+
+def test_unwrap_dek_wrong_length_nonce_raises(cipher: Cipher) -> None:
+    """unwrap_dek() must raise ValueError when nonce is not 12 bytes."""
+    dek = cipher.generate_dek()
+    wrapped = cipher.wrap_dek(dek)
+
+    bad_nonce_short = WrappedDEK(ciphertext=wrapped.ciphertext, nonce=b"\x00" * 8)
+    with pytest.raises(ValueError, match="nonce must be 12 bytes"):
+        cipher.unwrap_dek(bad_nonce_short)
+
+    bad_nonce_long = WrappedDEK(ciphertext=wrapped.ciphertext, nonce=b"\x00" * 16)
+    with pytest.raises(ValueError, match="nonce must be 12 bytes"):
+        cipher.unwrap_dek(bad_nonce_long)
+
+
+def test_decrypt_wrong_length_nonce_raises(cipher: Cipher) -> None:
+    """decrypt() must raise ValueError when nonce is not 12 bytes."""
+    dek = cipher.generate_dek()
+    ciphertext, _nonce = cipher.encrypt(b"test payload", dek)
+
+    with pytest.raises(ValueError, match="nonce must be 12 bytes"):
+        cipher.decrypt(ciphertext, b"\x00" * 8, dek)
+
+    with pytest.raises(ValueError, match="nonce must be 12 bytes"):
+        cipher.decrypt(ciphertext, b"\x00" * 16, dek)

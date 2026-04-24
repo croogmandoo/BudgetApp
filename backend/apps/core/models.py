@@ -56,7 +56,7 @@ class Attachment(TimestampedModel):
     sha256 = models.CharField(max_length=64)
 
     encrypted_blob_ref = models.CharField(max_length=512)
-    dek_enc = models.BinaryField()
+    dek_enc = models.BinaryField(editable=False)
 
     class Meta:
         indexes = [
