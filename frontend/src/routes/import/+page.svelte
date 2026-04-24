@@ -4,7 +4,7 @@
     Account,
     ImportConfirmResult,
     ImportPreviewResult,
-    ImportProfile,
+    ImportProfile
   } from '$lib/types';
 
   type Step = 'setup' | 'preview' | 'done';
@@ -27,7 +27,7 @@
   $effect(() => {
     Promise.all([
       api.get<{ results: Account[] }>('/finances/accounts/'),
-      api.get<{ results: ImportProfile[] }>('/finances/import-profiles/'),
+      api.get<{ results: ImportProfile[] }>('/finances/import-profiles/')
     ])
       .then(([accs, profs]) => {
         accounts = accs.results;
@@ -57,12 +57,16 @@
       form.append('file', file);
       const [sha, data] = await Promise.all([
         sha256hex(file),
-        api.post<ImportPreviewResult>('/finances/imports/preview/', form),
+        api.post<ImportPreviewResult>('/finances/imports/preview/', form)
       ]);
       fileSha256 = sha;
       preview = data;
       activeTab =
-        data.to_import.length > 0 ? 'import' : data.probable_duplicates.length > 0 ? 'dupes' : 'errors';
+        data.to_import.length > 0
+          ? 'import'
+          : data.probable_duplicates.length > 0
+            ? 'dupes'
+            : 'errors';
       step = 'preview';
     } catch (err) {
       error = err instanceof ApiError ? err.message : 'Preview failed — check the file format.';
@@ -81,7 +85,7 @@
         profile_id: profileId,
         filename: file?.name ?? '',
         file_sha256: fileSha256,
-        transactions: preview.to_import,
+        transactions: preview.to_import
       });
       result = data;
       step = 'done';
@@ -122,7 +126,9 @@
     return parseFloat(a) < 0 ? 'num-neg' : 'num-pos';
   }
 
-  let dupesCount = $derived((preview?.exact_duplicates.length ?? 0) + (preview?.probable_duplicates.length ?? 0));
+  let dupesCount = $derived(
+    (preview?.exact_duplicates.length ?? 0) + (preview?.probable_duplicates.length ?? 0)
+  );
 </script>
 
 <div class="px-5 py-6 space-y-6 max-w-3xl">
@@ -173,17 +179,28 @@
           class="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors duration-150
             {dragging ? 'border-accent bg-accent/5' : 'border-surface-3 hover:border-accent/60'}"
           role="button"
-          ondragover={(e) => { e.preventDefault(); dragging = true; }}
-          ondragleave={() => { dragging = false; }}
+          ondragover={(e) => {
+            e.preventDefault();
+            dragging = true;
+          }}
+          ondragleave={() => {
+            dragging = false;
+          }}
           ondrop={onDrop}
           onclick={() => (document.getElementById('file-input') as HTMLInputElement)?.click()}
-          onkeydown={(e) => e.key === 'Enter' && (document.getElementById('file-input') as HTMLInputElement)?.click()}
+          onkeydown={(e) =>
+            e.key === 'Enter' &&
+            (document.getElementById('file-input') as HTMLInputElement)?.click()}
         >
           {#if file}
             <p class="text-sm font-medium text-ink-primary">{file.name}</p>
-            <p class="text-xs text-ink-muted mt-1">{(file.size / 1024).toFixed(1)} KB · click to change</p>
+            <p class="text-xs text-ink-muted mt-1">
+              {(file.size / 1024).toFixed(1)} KB · click to change
+            </p>
           {:else}
-            <p class="text-sm text-ink-secondary">Drop file here or <span class="text-accent">browse</span></p>
+            <p class="text-sm text-ink-secondary">
+              Drop file here or <span class="text-accent">browse</span>
+            </p>
             <p class="text-xs text-ink-muted mt-1">CSV, XLS, XLSX — max 10 MB</p>
           {/if}
         </div>
@@ -200,7 +217,10 @@
       </div>
 
       {#if error}
-        <p class="rounded border border-negative/30 bg-negative/10 px-3 py-2 text-sm text-negative" role="alert">
+        <p
+          class="rounded border border-negative/30 bg-negative/10 px-3 py-2 text-sm text-negative"
+          role="alert"
+        >
           {error}
         </p>
       {/if}
@@ -219,15 +239,16 @@
   {#if step === 'preview' && preview}
     <!-- Summary strip -->
     <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-      {#each [
-        { label: 'To import', value: preview.to_import.length, accent: true },
-        { label: 'Exact duplicates', value: preview.exact_duplicates.length },
-        { label: 'Probable duplicates', value: preview.probable_duplicates.length },
-        { label: 'Parse errors', value: preview.parse_errors.length, warn: preview.parse_errors.length > 0 },
-      ] as stat}
+      {#each [{ label: 'To import', value: preview.to_import.length, accent: true }, { label: 'Exact duplicates', value: preview.exact_duplicates.length }, { label: 'Probable duplicates', value: preview.probable_duplicates.length }, { label: 'Parse errors', value: preview.parse_errors.length, warn: preview.parse_errors.length > 0 }] as stat}
         <div class="card px-4 py-3">
           <p class="text-[11px] uppercase tracking-wider text-ink-secondary mb-1">{stat.label}</p>
-          <p class="num text-xl font-medium {stat.accent ? 'text-accent' : stat.warn ? 'text-caution' : 'text-ink-primary'}">
+          <p
+            class="num text-xl font-medium {stat.accent
+              ? 'text-accent'
+              : stat.warn
+                ? 'text-caution'
+                : 'text-ink-primary'}"
+          >
             {stat.value}
           </p>
         </div>
@@ -237,16 +258,12 @@
     <!-- Tab bar -->
     <div class="card overflow-hidden">
       <div class="flex border-b border-surface-3">
-        {#each [
-          { id: 'import' as Tab, label: `To Import (${preview.to_import.length})` },
-          { id: 'dupes' as Tab, label: `Duplicates (${dupesCount})` },
-          { id: 'errors' as Tab, label: `Errors (${preview.parse_errors.length})` },
-        ] as tab}
+        {#each [{ id: 'import' as Tab, label: `To Import (${preview.to_import.length})` }, { id: 'dupes' as Tab, label: `Duplicates (${dupesCount})` }, { id: 'errors' as Tab, label: `Errors (${preview.parse_errors.length})` }] as tab}
           <button
             class="px-4 py-2.5 text-sm font-medium transition-colors duration-100
               {activeTab === tab.id
-                ? 'border-b-2 border-accent text-accent'
-                : 'text-ink-secondary hover:text-ink-primary'}"
+              ? 'border-b-2 border-accent text-accent'
+              : 'text-ink-secondary hover:text-ink-primary'}"
             onclick={() => (activeTab = tab.id)}
           >
             {tab.label}
@@ -264,20 +281,29 @@
               <thead>
                 <tr class="border-b border-surface-3">
                   {#each ['Date', 'Payee', 'Memo', 'Amount'] as col, i}
-                    <th class="px-4 py-2 text-[11px] font-medium uppercase tracking-wider text-ink-muted
+                    <th
+                      class="px-4 py-2 text-[11px] font-medium uppercase tracking-wider text-ink-muted
                       {i === 3 ? 'text-right' : 'text-left'}
-                      {i === 2 ? 'hidden sm:table-cell' : ''}">{col}</th>
+                      {i === 2 ? 'hidden sm:table-cell' : ''}">{col}</th
+                    >
                   {/each}
                 </tr>
               </thead>
               <tbody>
                 {#each preview.to_import as row}
-                  <tr class="border-b border-surface-3/50 last:border-0 hover:bg-surface-2 transition-colors duration-100">
-                    <td class="px-4 py-2.5 num text-[12px] text-ink-muted whitespace-nowrap">{row.date}</td>
+                  <tr
+                    class="border-b border-surface-3/50 last:border-0 hover:bg-surface-2 transition-colors duration-100"
+                  >
+                    <td class="px-4 py-2.5 num text-[12px] text-ink-muted whitespace-nowrap"
+                      >{row.date}</td
+                    >
                     <td class="px-4 py-2.5 text-ink-primary font-medium">{row.payee || '—'}</td>
-                    <td class="hidden sm:table-cell px-4 py-2.5 text-ink-secondary text-xs truncate max-w-[200px]">{row.memo || '—'}</td>
+                    <td
+                      class="hidden sm:table-cell px-4 py-2.5 text-ink-secondary text-xs truncate max-w-[200px]"
+                      >{row.memo || '—'}</td
+                    >
                     <td class="px-4 py-2.5 text-right">
-                      <span class="{amountClass(row.amount)}">{fmtAmount(row.amount)}</span>
+                      <span class={amountClass(row.amount)}>{fmtAmount(row.amount)}</span>
                     </td>
                   </tr>
                 {/each}
@@ -297,27 +323,41 @@
               <thead>
                 <tr class="border-b border-surface-3">
                   {#each ['Date', 'Payee', 'Amount', 'Reason'] as col, i}
-                    <th class="px-4 py-2 text-[11px] font-medium uppercase tracking-wider text-ink-muted
+                    <th
+                      class="px-4 py-2 text-[11px] font-medium uppercase tracking-wider text-ink-muted
                       {i === 2 ? 'text-right' : 'text-left'}
-                      {i === 3 ? 'hidden sm:table-cell' : ''}">{col}</th>
+                      {i === 3 ? 'hidden sm:table-cell' : ''}">{col}</th
+                    >
                   {/each}
                 </tr>
               </thead>
               <tbody>
                 {#each preview.exact_duplicates as row}
                   <tr class="border-b border-surface-3/50 last:border-0">
-                    <td class="px-4 py-2.5 num text-[12px] text-ink-muted whitespace-nowrap">{row.date}</td>
+                    <td class="px-4 py-2.5 num text-[12px] text-ink-muted whitespace-nowrap"
+                      >{row.date}</td
+                    >
                     <td class="px-4 py-2.5 text-ink-secondary">{row.payee || '—'}</td>
-                    <td class="px-4 py-2.5 text-right"><span class="{amountClass(row.amount)}">{fmtAmount(row.amount)}</span></td>
-                    <td class="hidden sm:table-cell px-4 py-2.5"><span class="pill bg-surface-3 text-ink-muted">Exact match</span></td>
+                    <td class="px-4 py-2.5 text-right"
+                      ><span class={amountClass(row.amount)}>{fmtAmount(row.amount)}</span></td
+                    >
+                    <td class="hidden sm:table-cell px-4 py-2.5"
+                      ><span class="pill bg-surface-3 text-ink-muted">Exact match</span></td
+                    >
                   </tr>
                 {/each}
                 {#each preview.probable_duplicates as row}
                   <tr class="border-b border-surface-3/50 last:border-0">
-                    <td class="px-4 py-2.5 num text-[12px] text-ink-muted whitespace-nowrap">{row.date}</td>
+                    <td class="px-4 py-2.5 num text-[12px] text-ink-muted whitespace-nowrap"
+                      >{row.date}</td
+                    >
                     <td class="px-4 py-2.5 text-ink-secondary">{row.payee || '—'}</td>
-                    <td class="px-4 py-2.5 text-right"><span class="{amountClass(row.amount)}">{fmtAmount(row.amount)}</span></td>
-                    <td class="hidden sm:table-cell px-4 py-2.5"><span class="pill bg-caution/10 text-caution">{row.match_reason}</span></td>
+                    <td class="px-4 py-2.5 text-right"
+                      ><span class={amountClass(row.amount)}>{fmtAmount(row.amount)}</span></td
+                    >
+                    <td class="hidden sm:table-cell px-4 py-2.5"
+                      ><span class="pill bg-caution/10 text-caution">{row.match_reason}</span></td
+                    >
                   </tr>
                 {/each}
               </tbody>
@@ -335,8 +375,14 @@
             <table class="w-full text-sm">
               <thead>
                 <tr class="border-b border-surface-3">
-                  <th class="px-4 py-2 text-[11px] font-medium uppercase tracking-wider text-ink-muted text-left">Row</th>
-                  <th class="px-4 py-2 text-[11px] font-medium uppercase tracking-wider text-ink-muted text-left">Reason</th>
+                  <th
+                    class="px-4 py-2 text-[11px] font-medium uppercase tracking-wider text-ink-muted text-left"
+                    >Row</th
+                  >
+                  <th
+                    class="px-4 py-2 text-[11px] font-medium uppercase tracking-wider text-ink-muted text-left"
+                    >Reason</th
+                  >
                 </tr>
               </thead>
               <tbody>
@@ -354,7 +400,10 @@
     </div>
 
     {#if error}
-      <p class="rounded border border-negative/30 bg-negative/10 px-3 py-2 text-sm text-negative" role="alert">
+      <p
+        class="rounded border border-negative/30 bg-negative/10 px-3 py-2 text-sm text-negative"
+        role="alert"
+      >
         {error}
       </p>
     {/if}
@@ -365,7 +414,9 @@
         onclick={handleConfirm}
         disabled={!preview.to_import.length || loading}
       >
-        {loading ? 'Importing…' : `Import ${preview.to_import.length} transaction${preview.to_import.length === 1 ? '' : 's'}`}
+        {loading
+          ? 'Importing…'
+          : `Import ${preview.to_import.length} transaction${preview.to_import.length === 1 ? '' : 's'}`}
       </button>
       <button class="btn-ghost" onclick={reset}>Cancel</button>
     </div>
