@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import re
 import uuid
+from datetime import date as _date_type
+from decimal import Decimal
 from typing import cast
 
 from django.db import transaction as db_transaction
@@ -14,7 +16,7 @@ from rest_framework.views import APIView
 from apps.accounts.models import User
 from apps.core.permissions import IsTOTPVerifiedHouseholdMember
 from apps.finances.importers.dedup import exact_duplicate_hashes, fuzzy_duplicates
-from apps.finances.importers.parser import parse_file
+from apps.finances.importers.parser import _compute_hash, _normalize_payee, parse_file
 from apps.finances.importers.rules import apply_rules
 from apps.finances.models import Account, ImportBatch, ImportProfile, Transaction
 
@@ -126,7 +128,7 @@ class ImportConfirmView(APIView):
         except Account.DoesNotExist:
             return Response({"detail": "Account not found."}, status=404)
         try:
-            ImportProfile.objects.get(id=profile_id, household_id=hh)
+            profile = ImportProfile.objects.get(id=profile_id, household_id=hh)
         except ImportProfile.DoesNotExist:
             return Response({"detail": "Import profile not found."}, status=404)
 
@@ -148,13 +150,26 @@ class ImportConfirmView(APIView):
                     status=400,
                 )
             try:
-                from decimal import Decimal as _D
-                _D(str(amount_val))
+                Decimal(str(amount_val))
             except Exception:
                 return Response(
                     {"detail": f"transactions[{i}]: invalid amount '{amount_val}'"},
                     status=400,
                 )
+            try:
+                amount_decimal = Decimal(str(amount_val))
+                sign = profile.mapping_json.get("sign_convention", "positive_is_credit")
+                raw_amount = -amount_decimal if sign == "positive_is_debit" else amount_decimal
+                payee = t.get("payee", "")
+                date_val_parsed = _date_type.fromisoformat(str(date_val))
+                expected_hash = _compute_hash(str(account.id), date_val_parsed, raw_amount, payee)
+                if expected_hash != h:
+                    return Response(
+                        {"detail": f"transactions[{i}]: hash mismatch"},
+                        status=400,
+                    )
+            except (ValueError, TypeError):
+                pass
             incoming_hashes.append(h)
             validated.append(t)
 
