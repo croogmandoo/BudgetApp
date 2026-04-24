@@ -15,6 +15,7 @@ from __future__ import annotations
 from django.urls import include, path
 
 urlpatterns = [
+    path("auth/", include("apps.accounts.auth_urls")),
     path("accounts/", include("apps.accounts.api_urls")),
     path("core/", include("apps.core.api_urls")),
     path("finances/", include("apps.finances.api_urls")),

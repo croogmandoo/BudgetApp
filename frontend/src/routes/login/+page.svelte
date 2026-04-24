@@ -1,16 +1,43 @@
 <script lang="ts">
-  // TODO: wire to /api/v1/auth/login/ (password + TOTP — SPEC §7.1).
+  import { goto } from '$app/navigation';
+  import { api, ApiError } from '$lib/api';
+  import type { User, Household } from '$lib/types';
+  import { setSession } from '$lib/stores/session';
+
   let email = $state('');
   let password = $state('');
   let totp = $state('');
   let submitting = $state(false);
   let error = $state<string | null>(null);
 
-  function handleSubmit(e: SubmitEvent) {
+  async function handleSubmit(e: SubmitEvent) {
     e.preventDefault();
     submitting = true;
-    error = 'Auth not wired yet — backend coming in M0.';
-    submitting = false;
+    error = null;
+
+    try {
+      const data = await api.post<{
+        totp_enrollment_required: boolean;
+        user: User;
+        household?: Household;
+      }>('/auth/login/', { email, password, totp_token: totp });
+
+      if (data.totp_enrollment_required) {
+        // Partial session — go enroll TOTP
+        await goto('/totp-setup');
+      } else {
+        setSession({ user: data.user, household: data.household ?? null, totp_verified: true });
+        await goto('/');
+      }
+    } catch (err) {
+      if (err instanceof ApiError) {
+        error = (err.body?.detail as string) ?? 'Sign in failed. Please try again.';
+      } else {
+        error = 'An unexpected error occurred.';
+      }
+    } finally {
+      submitting = false;
+    }
   }
 </script>
 

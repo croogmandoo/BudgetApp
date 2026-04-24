@@ -156,7 +156,7 @@ export interface MaintenanceTask {
 
 export interface Session {
   user: User;
-  household: Household;
+  household: Household | null; // null until household is assigned (first-run setup)
   // TOTP is mandatory (SPEC section 7.1). Once a session is fully established
   // this is true; intermediate "password-only" sessions should be rejected.
   totp_verified: boolean;

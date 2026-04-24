@@ -45,6 +45,7 @@ class User(AbstractUser):
     """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    email = models.EmailField(unique=True)
     household = models.ForeignKey(
         Household,
         on_delete=models.PROTECT,
