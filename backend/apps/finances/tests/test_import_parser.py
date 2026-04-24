@@ -1,5 +1,7 @@
 from __future__ import annotations
 import io
+import uuid
+from datetime import date as date_type
 from decimal import Decimal
 
 import pytest
@@ -147,9 +149,6 @@ def test_import_hash_is_stable():
 # Dedup tests
 # ---------------------------------------------------------------------------
 
-import uuid
-from datetime import date as date_type
-
 from apps.finances.importers.dedup import exact_duplicate_hashes, fuzzy_duplicates
 from apps.finances.importers.parser import ParsedRow
 from apps.finances.models import Account, Transaction
@@ -282,3 +281,44 @@ def test_apply_rules_no_match_leaves_uncategorised():
     apply_rules([str(txn.id)], str(hh.id))
     txn.refresh_from_db()
     assert txn.category_id is None
+
+
+@pytest.mark.django_db
+def test_apply_rules_memo_contains():
+    hh = _make_household()
+    acct = _make_account(hh)
+    cat = Category.objects.create(household=hh, name="Bills", kind="expense")
+    Rule.objects.create(
+        household=hh, priority=10,
+        match_json={"memo_contains": "INTERNET"},
+        action_json={"set_category": str(cat.id)},
+    )
+    txn = Transaction.objects.create(
+        account=acct, date=date_type(2026, 4, 10), amount=Decimal("-89.99"),
+        payee="ROGERS COMM", memo="INTERNET BILL APRIL",
+        import_hash="hash-rogers",
+    )
+    count = apply_rules([str(txn.id)], str(hh.id))
+    assert count == 1
+    txn.refresh_from_db()
+    assert txn.category_id == cat.id
+
+
+@pytest.mark.django_db
+def test_apply_rules_amount_lt():
+    hh = _make_household()
+    acct = _make_account(hh)
+    cat = Category.objects.create(household=hh, name="Small", kind="expense")
+    Rule.objects.create(
+        household=hh, priority=10,
+        match_json={"amount_lt": 0},
+        action_json={"set_category": str(cat.id)},
+    )
+    txn = Transaction.objects.create(
+        account=acct, date=date_type(2026, 4, 10), amount=Decimal("-10"),
+        payee="COFFEE", import_hash="hash-coffee",
+    )
+    count = apply_rules([str(txn.id)], str(hh.id))
+    assert count == 1
+    txn.refresh_from_db()
+    assert txn.category_id == cat.id
