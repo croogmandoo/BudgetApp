@@ -1,7 +1,7 @@
 import type { LayoutLoad } from './$types';
 import { goto } from '$app/navigation';
 import { browser } from '$app/environment';
-import { api, ApiError } from '$lib/api';
+import { api } from '$lib/api';
 import { setSession, clearSession } from '$lib/stores/session';
 import type { User, Household } from '$lib/types';
 
@@ -15,7 +15,7 @@ export const load: LayoutLoad = async ({ url }) => {
   try {
     const data = await api.get<{ user: User; household: Household | null }>('/auth/me/');
     setSession({ user: data.user, household: data.household, totp_verified: true });
-  } catch (err) {
+  } catch {
     clearSession();
     if (!isPublic) {
       await goto('/login');
