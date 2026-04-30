@@ -36,7 +36,7 @@ dev = [
     # constructor. Cap below 1.20 until django-stubs ships a compatible
     # release. Bump the cap (and re-run 'uv run mypy .') when Dependabot
     # offers a newer django-stubs.
-    "mypy>=1.11,<1.20",
+    "mypy>=1.11,<1.21",
     "django-stubs[compatible-mypy]>=5.0",
     "djangorestframework-stubs[compatible-mypy]>=3.15",
     "pip-audit>=2.7,<3.0",
