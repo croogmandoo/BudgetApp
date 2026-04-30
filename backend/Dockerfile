@@ -3,7 +3,7 @@
 # ---------------------------------------------------------------------------
 # Stage 1: build virtualenv with uv.
 # ---------------------------------------------------------------------------
-FROM python:3.12-slim AS builder
+FROM python:3.14-slim AS builder
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -56,7 +56,7 @@ RUN uv venv /opt/venv \
 # ---------------------------------------------------------------------------
 # Stage 2: runtime image.
 # ---------------------------------------------------------------------------
-FROM python:3.12-slim AS runtime
+FROM python:3.14-slim AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
