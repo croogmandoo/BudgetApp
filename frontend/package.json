@@ -20,7 +20,7 @@
     "@sveltejs/adapter-node": "^5.2.9",
     "@sveltejs/kit": "^2.8.0",
     "@sveltejs/vite-plugin-svelte": "^5.0.0",
-    "svelte": "^5.1.9",
+    "svelte": "^5.55.5",
     "tailwindcss": "^3.4.14",
     "postcss": "^8.4.47",
     "autoprefixer": "^10.4.20"
