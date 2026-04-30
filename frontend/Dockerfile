@@ -4,7 +4,7 @@
 # ---------- deps: production-only node_modules ----------
 # Separate stage so the runtime image gets a lean, dev-free node_modules
 # without having to install everything twice in one stage.
-FROM node:22-alpine AS deps
+FROM node:25-alpine AS deps
 
 WORKDIR /app
 RUN corepack enable
@@ -13,7 +13,7 @@ COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile --prod
 
 # ---------- builder ----------
-FROM node:22-alpine AS builder
+FROM node:25-alpine AS builder
 
 WORKDIR /app
 RUN corepack enable
@@ -25,7 +25,7 @@ COPY . .
 RUN pnpm build
 
 # ---------- runtime ----------
-FROM node:22-alpine AS runtime
+FROM node:25-alpine AS runtime
 
 WORKDIR /app
 
